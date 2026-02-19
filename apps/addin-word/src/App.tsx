@@ -28,7 +28,7 @@ export default function App() {
   const runTask = async (payload: Record<string, unknown>) => {
     setBusy(true);
     try {
-      const response = await fetch("/api/task", {
+      const response = await fetch("http://localhost:8080/api/task", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -43,7 +43,7 @@ export default function App() {
   const summarizeDocument = async () => {
     const documentText = await getDocumentText();
     const payloadDocs = [{ id: "word-body", title: "Word Document", content: documentText }, ...documents];
-    await runTask({ task: "summarize", documents: payloadDocs, instructions, enableCritic });
+    await runTask({ task: "summarize", documents: payloadDocs, instructions, style: "paragraph", enableCritic });
   };
 
   const rewriteSelection = async () => {

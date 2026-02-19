@@ -1,0 +1,35 @@
+package main
+
+import (
+	"os"
+
+	"github.com/alanmaizon/homer/backend/internal/api"
+	"github.com/alanmaizon/homer/backend/internal/middleware"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	router := gin.New()
+	router.Use(gin.Recovery())
+	router.Use(middleware.RequestID())
+	router.Use(middleware.Logging())
+	router.Use(cors.New(cors.Config{
+		AllowOrigins: []string{
+			"http://localhost:3000",
+			"http://localhost:5173",
+			"http://localhost",
+		},
+		AllowMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "X-Request-Id"},
+	}))
+
+	api.RegisterRoutes(router)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	_ = router.Run(":" + port)
+}
