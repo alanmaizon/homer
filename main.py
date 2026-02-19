@@ -5,6 +5,11 @@ from typing import Any, Dict, List, Optional
 
 
 SLANG_WORDS = {"awesome", "cool", "kinda", "sorta", "gonna", "wanna", "lol"}
+SHORTER_TOO_LONG_THRESHOLD = 320
+SHORTER_SUGGESTED_LIMIT = 180
+SIMPLIFY_SUGGESTED_LIMIT = 200
+SIMPLIFY_LONG_WORD_MIN = 16
+SIMPLIFY_LONG_WORD_COUNT = 2
 
 
 def _is_bullet_line(line: str) -> bool:
@@ -63,7 +68,7 @@ def review(payload: Dict[str, Any]) -> Dict[str, Any]:
         issues.append("Style mismatch: expected paragraph format.")
         major = True
 
-    if mode == "shorter" and len(output) > 320:
+    if mode == "shorter" and len(output) > SHORTER_TOO_LONG_THRESHOLD:
         issues.append("Too long for shorter mode.")
         major = True
 
@@ -74,8 +79,8 @@ def review(payload: Dict[str, Any]) -> Dict[str, Any]:
             major = True
 
     if mode == "simplify":
-        long_words = [w for w in re.findall(r"\b\w+\b", output) if len(w) >= 16]
-        if len(long_words) >= 2:
+        long_words = [w for w in re.findall(r"\b\w+\b", output) if len(w) >= SIMPLIFY_LONG_WORD_MIN]
+        if len(long_words) >= SIMPLIFY_LONG_WORD_COUNT:
             issues.append("Mode mismatch: simplify output is too complex.")
             major = True
 
@@ -99,9 +104,9 @@ def review(payload: Dict[str, Any]) -> Dict[str, Any]:
     if mode == "professional":
         suggested = _sanitize_professional(suggested)
     if mode == "simplify":
-        suggested = _shorten(suggested, 200)
+        suggested = _shorten(suggested, SIMPLIFY_SUGGESTED_LIMIT)
     if mode == "shorter":
-        suggested = _shorten(suggested, 180)
+        suggested = _shorten(suggested, SHORTER_SUGGESTED_LIMIT)
     if style == "bullet":
         suggested = _to_bullets(_to_paragraph(suggested))
     elif style == "paragraph":
