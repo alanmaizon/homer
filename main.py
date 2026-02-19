@@ -1,6 +1,7 @@
 import json
 import re
 import sys
+import unicodedata
 from typing import Any, Dict, List, Optional
 
 
@@ -29,7 +30,7 @@ def _to_paragraph(text: str) -> str:
 
 
 def _sanitize_professional(text: str) -> str:
-    clean = re.sub(r"[😀-🙏🌀-🗿🚀-🛿🇠-🇿]+", "", text)
+    clean = "".join(ch for ch in text if unicodedata.category(ch) != "So")
     words = []
     for word in clean.split():
         plain = re.sub(r"[^a-zA-Z]", "", word).lower()
@@ -39,6 +40,10 @@ def _sanitize_professional(text: str) -> str:
     clean = " ".join(words)
     clean = re.sub(r"!{2,}", "!", clean)
     return clean.strip()
+
+
+def _contains_symbol_emoji(text: str) -> bool:
+    return any(unicodedata.category(ch) == "So" for ch in text)
 
 
 def _shorten(text: str, limit: int = 180) -> str:
@@ -74,7 +79,7 @@ def review(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     if mode == "professional":
         tokens = re.findall(r"\b\w+\b", output.lower())
-        if any(token in SLANG_WORDS for token in tokens) or re.search(r"[😀-🙏🌀-🗿🚀-🛿🇠-🇿]", output):
+        if any(token in SLANG_WORDS for token in tokens) or _contains_symbol_emoji(output):
             issues.append("Tone mismatch: expected professional language.")
             major = True
 
