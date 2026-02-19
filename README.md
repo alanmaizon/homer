@@ -6,6 +6,7 @@ Homer is a Microsoft Word AI task pane MVP built for the Agents League challenge
 - Selection rewrite
 - Multi-snippet summary input
 - Foundry-inspired multi-agent orchestration
+- Go (Gin) backend with Planner â†’ Executor â†’ Critic orchestration
 
 ## 2) Why this is an Agent (not just an API call)
 Homer is designed as explicit role-based agent collaboration:
@@ -56,9 +57,17 @@ Designed following Microsoft Foundry multi-agent reasoning patterns: **Planner â
   pnpm-workspace.yaml
   README.md
   .env.example
+  backend/
+    go.mod
+    cmd/server/main.go
+    internal/
+      api/
+      agents/
+      domain/
+      llm/
+      middleware/
   apps/
     addin-word/
-    backend/
   packages/
     shared/
 ```
@@ -66,9 +75,8 @@ Designed following Microsoft Foundry multi-agent reasoning patterns: **Planner â
 ## Scripts
 ```bash
 pnpm install
-pnpm dev
-pnpm build
-pnpm typecheck
+cd backend && go run ./cmd/server
+pnpm --filter @homer/addin-word dev
 ```
 # Homer Executor
 
