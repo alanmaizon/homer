@@ -38,14 +38,15 @@ def _clarification_response(request_id, task, missing_fields):
 def build_plan(payload):
     request_id = payload.get("requestId", "")
     task = payload.get("task")
-    documents = payload.get("documents") or []
+    raw_documents = payload.get("documents")
+    documents = raw_documents if isinstance(raw_documents, list) else []
     text = payload.get("text")
     mode = payload.get("mode")
     style = payload.get("style")
     instructions = payload.get("instructions")
     enable_critic = bool(payload.get("enableCritic"))
 
-    if task == "summarize" and len(documents) < 1:
+    if task == "summarize" and not documents:
         return _clarification_response(request_id, task, ["documents"])
     if task == "rewrite" and mode is None:
         return _clarification_response(request_id, task, ["mode"])
@@ -88,7 +89,7 @@ def build_plan(payload):
             }
         )
         if task == "summarize":
-            assumptions.append("Critic checks clarity, brevity, and sensitive leakage.")
+            assumptions.append("Critic checks clarity, brevity, and sensitive leaks.")
         else:
             assumptions.append("Critic checks meaning preservation and mode adherence.")
 
