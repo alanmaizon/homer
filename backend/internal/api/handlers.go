@@ -20,14 +20,26 @@ func RegisterRoutes(router *gin.Engine) {
 			return
 		}
 
-		if req.Task == "" || len(req.Documents) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "task and documents are required"})
+		if req.Task == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "task is required"})
+			return
+		}
+		if req.Task == domain.TaskSummarize && len(req.Documents) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "documents are required for summarize"})
+			return
+		}
+		if req.Task == domain.TaskRewrite && req.Text == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "text is required for rewrite"})
+			return
+		}
+		if req.Task != domain.TaskSummarize && req.Task != domain.TaskRewrite {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported task"})
 			return
 		}
 
 		response, err := agents.ExecuteTask(c.Request.Context(), req)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 

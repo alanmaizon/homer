@@ -38,7 +38,6 @@ func TestExecuteTaskCritic(t *testing.T) {
 		Text:         "Rewrite this.",
 		Mode:         "professional",
 		EnableCritic: true,
-		Documents:    []domain.Document{{ID: "1", Title: "Doc", Content: "unused"}},
 	})
 	if err != nil {
 		t.Fatalf("ExecuteTask returned error: %v", err)

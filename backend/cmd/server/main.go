@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 
 	"github.com/alanmaizon/homer/backend/internal/api"
@@ -31,5 +32,7 @@ func main() {
 		port = "8080"
 	}
 
-	_ = router.Run(":" + port)
+	if err := router.Run(":" + port); err != nil {
+		log.Fatalf("failed to start server on port %s: %v", port, err)
+	}
 }

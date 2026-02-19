@@ -14,9 +14,6 @@ func ExecuteStep(ctx context.Context, step domain.PlanStep, req domain.TaskReque
 	case string(domain.TaskSummarize):
 		return provider.Summarize(ctx, req.Documents, req.Style, req.Instructions)
 	case string(domain.TaskRewrite):
-		if req.Text == "" {
-			return "", errors.New("text is required for rewrite")
-		}
 		return provider.Rewrite(ctx, req.Text, req.Mode, req.Instructions)
 	default:
 		return "", errors.New("unsupported executor action")
