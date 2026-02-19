@@ -1,82 +1,72 @@
-# Castlewood-Records
-ERD for a music shop
+# Homer
 
-```mermaid
+## 1) Overview
+Homer is a Microsoft Word AI task pane MVP built for the Agents League challenge. It delivers:
+- Document summary
+- Selection rewrite
+- Multi-snippet summary input
+- Foundry-inspired multi-agent orchestration
 
-erDiagram
-    CUSTOMER {
-        int id PK
-        string name
-        string email
-        string phone
-        datetime created_at
-    }
+## 2) Why this is an Agent (not just an API call)
+Homer is designed as explicit role-based agent collaboration:
+- **Orchestrator Agent** receives user intent and context
+- **Planner Agent** creates an execution plan
+- **Executor Agent** performs plan steps through a provider abstraction
+- **Critic Agent (optional)** validates/improves output when enabled
 
-    ALBUM {
-        int id PK
-        string title
-        string artist
-        string genre
-        datetime release_date
-        float price
-        int available_stock
-    }
+This means reasoning and execution are separated, making the system extensible beyond one-shot LLM calls.
 
-    SONG {
-        int id PK
-        int album_id FK
-        string title
-        string artist
-        float price
-        datetime release_date
-        int available_stock
-    }
+## 3) Architecture Diagram (ASCII)
+```text
+User (Word Task Pane)
+        ↓
+Orchestrator Agent
+        ↓
+Planner Agent (task plan)
+        ↓
+Executor Agent (provider call)
+        ↓
+Optional Critic Agent (feature-flagged)
+```
 
-    PURCHASE {
-        int id PK
-        int customer_id FK
-        int album_id FK
-        int song_id FK
-        datetime purchase_date
-        float total_price
-        string purchase_method
-    }
+Designed following Microsoft Foundry multi-agent reasoning patterns: **Planner → Executor → Critic**.
 
-    EMPLOYEE {
-        int id PK
-        string name
-        string email
-        string role
-    }
+## 4) Demo Flow (3-step)
+1. User selects Summarize Document or Rewrite Selection in the task pane.
+2. Backend `/api/task` orchestrates planner → executor (+ optional critic).
+3. Output returns to the pane for preview, then Insert/Replace writes it back to Word.
 
-    INVENTORY_UPDATE {
-        int id PK
-        int employee_id FK
-        int album_id FK
-        int song_id FK
-        string update_type
-        datetime update_time
-        float new_price
-    }
+## 5) Privacy-by-design
+- Request IDs added for traceability.
+- Document text is not logged in backend handlers.
+- Provider selection and API keys are environment-variable based.
+- Critic is optional and disabled by default.
+- TODO: enterprise provider controls (tenant isolation, DLP checks, encryption-at-rest policy integration).
 
-    MANAGER {
-        int id PK
-        string name
-        string email
-    }
+## 6) Roadmap
+- Microsoft Graph multi-document ingestion
+- Foundry SDK integration
+- Copilot Studio deployment
+- Citation validation agent
 
-    REPORT {
-        int id PK
-        int manager_id FK
-        datetime report_date
-        string report_type
-        text content
-    }
+## Repository Structure
+```text
+/
+  package.json
+  pnpm-workspace.yaml
+  README.md
+  .env.example
+  apps/
+    addin-word/
+    backend/
+  packages/
+    shared/
+```
 
-    CUSTOMER ||--o{ PURCHASE : "makes"
-    ALBUM ||--o{ PURCHASE : "part of"
-    SONG ||--o{ PURCHASE : "part of"
-    EMPLOYEE ||--o{ INVENTORY_UPDATE : "makes"
-    INVENTORY_UPDATE ||--o{ ALBUM : "updates"
-    INVENTORY_UPDATE ||--o{ SONG : "updates"
-    MANAGER ||--o{ REPORT : "generates"
+## Scripts
+```bash
+pnpm install
+pnpm dev
+pnpm build
+pnpm typecheck
+```

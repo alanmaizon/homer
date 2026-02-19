@@ -1,0 +1,19 @@
+{
+  "name": "homer",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter @homer/backend dev\" \"pnpm --filter @homer/addin-word dev\"",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.9.2"
+  },
+  "packageManager": "pnpm@10.11.1"
+}

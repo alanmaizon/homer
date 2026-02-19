@@ -1,0 +1,48 @@
+:root {
+  font-family: Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f5f6f8;
+}
+
+.pane {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.snippet {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+input,
+select,
+textarea,
+button {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+}
+
+button {
+  cursor: pointer;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle input {
+  width: auto;
+}
