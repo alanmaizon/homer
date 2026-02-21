@@ -149,6 +149,10 @@ components:
       properties:
         provider:
           type: string
+          enum:
+            - mock
+            - openai
+            - gemini
         executionTimeMs:
           type: integer
           format: int64

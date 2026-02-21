@@ -21,7 +21,7 @@ POST /api/task
 Planner -> Executor -> (Optional) Critic
         |
         v
-Provider (mock or OpenAI)
+Provider (mock, OpenAI, or Gemini)
 ```
 
 ## Request shape
@@ -91,9 +91,19 @@ curl -sS -X POST http://localhost:8080/api/task \
 ## Environment
 Copy `.env.example` values into your shell/session:
 - `PORT` (default `8080`)
-- `LLM_PROVIDER` (`mock` or `openai`)
+- `LLM_PROVIDER` (`mock`, `openai`, or `gemini`)
 - `OPENAI_API_KEY` (required when provider is `openai`)
 - `OPENAI_MODEL` (default `gpt-4o-mini`)
+- `GEMINI_API_KEY` or `GOOGLE_API_KEY` (required when provider is `gemini`)
+- `GEMINI_MODEL` (default `gemini-2.5-flash`)
+
+Example Gemini setup:
+
+```bash
+export LLM_PROVIDER=gemini
+export GEMINI_API_KEY=your_api_key
+export GEMINI_MODEL=gemini-2.5-flash
+```
 
 ## Run
 ```bash

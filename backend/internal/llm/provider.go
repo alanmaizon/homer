@@ -16,8 +16,13 @@ type LLMProvider interface {
 var currentProvider LLMProvider = NewProviderFromEnv()
 
 func NewProviderFromEnv() LLMProvider {
-	if os.Getenv("LLM_PROVIDER") == "openai" {
+	switch os.Getenv("LLM_PROVIDER") {
+	case "openai":
 		if provider, err := NewOpenAIProviderFromEnv(); err == nil {
+			return provider
+		}
+	case "gemini":
+		if provider, err := NewGeminiProviderFromEnv(); err == nil {
 			return provider
 		}
 	}
