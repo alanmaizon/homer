@@ -32,6 +32,7 @@ func RegisterRoutes(router *gin.Engine) {
 			writeError(c, http.StatusInternalServerError, "internal_error", err.Error())
 			return
 		}
+		response.Metadata.RequestID = middleware.GetRequestID(c)
 
 		c.JSON(http.StatusOK, response)
 	})

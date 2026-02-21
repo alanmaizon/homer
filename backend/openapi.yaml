@@ -1,0 +1,190 @@
+openapi: 3.0.3
+info:
+  title: Homer API
+  version: 0.2.0
+  description: Platform-agnostic multi-agent text service.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/health:
+    get:
+      summary: Health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ok
+                properties:
+                  ok:
+                    type: boolean
+              example:
+                ok: true
+  /api/task:
+    post:
+      summary: Run summarize or rewrite task
+      operationId: runTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskRequest"
+            examples:
+              summarize:
+                summary: Summarize documents
+                value:
+                  task: summarize
+                  documents:
+                    - id: doc-1
+                      title: Meeting notes
+                      content: Q1 plan includes partner launch and hiring.
+                  style: paragraph
+                  instructions: Focus on action items.
+                  enableCritic: false
+              rewrite:
+                summary: Rewrite text
+                value:
+                  task: rewrite
+                  documents: []
+                  text: We will utilize the platform to improve productivity.
+                  mode: simplify
+                  instructions: Keep it concise.
+                  enableCritic: true
+      responses:
+        "200":
+          description: Task completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskResponse"
+        "400":
+          description: Invalid task payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                missingText:
+                  value:
+                    error:
+                      code: missing_text
+                      message: text is required for rewrite
+                      requestId: 4e11fe43-e81c-40e8-b5cf-f9d4f0a65fe6
+        "500":
+          description: Internal processing failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+components:
+  schemas:
+    Document:
+      type: object
+      required:
+        - id
+        - title
+        - content
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+    TaskRequest:
+      type: object
+      required:
+        - task
+      properties:
+        task:
+          type: string
+          enum:
+            - summarize
+            - rewrite
+        documents:
+          type: array
+          description: Required for summarize tasks.
+          items:
+            $ref: "#/components/schemas/Document"
+        text:
+          type: string
+          description: Required for rewrite tasks.
+        mode:
+          type: string
+          description: Rewrite mode.
+        instructions:
+          type: string
+        style:
+          type: string
+        enableCritic:
+          type: boolean
+          default: false
+    PlanStep:
+      type: object
+      required:
+        - id
+        - role
+        - action
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+          enum:
+            - planner
+            - executor
+            - critic
+        action:
+          type: string
+    Metadata:
+      type: object
+      required:
+        - provider
+        - executionTimeMs
+      properties:
+        provider:
+          type: string
+        executionTimeMs:
+          type: integer
+          format: int64
+        requestId:
+          type: string
+    TaskResponse:
+      type: object
+      required:
+        - result
+        - plan
+        - metadata
+      properties:
+        result:
+          type: string
+        plan:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanStep"
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    APIError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        requestId:
+          type: string
+    APIErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          $ref: "#/components/schemas/APIError"

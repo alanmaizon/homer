@@ -57,6 +57,37 @@ Validation and runtime errors return:
 }
 ```
 
+## API spec
+- OpenAPI: `backend/openapi.yaml`
+
+## Examples
+Summarize:
+
+```bash
+curl -sS -X POST http://localhost:8080/api/task \
+  -H "Content-Type: application/json" \
+  -d '{
+    "task":"summarize",
+    "documents":[{"id":"d1","title":"Doc","content":"Launch is planned for Q1."}],
+    "style":"paragraph",
+    "instructions":"Focus on milestones"
+  }'
+```
+
+Rewrite:
+
+```bash
+curl -sS -X POST http://localhost:8080/api/task \
+  -H "Content-Type: application/json" \
+  -d '{
+    "task":"rewrite",
+    "documents":[],
+    "text":"We will utilize the system to optimize efficiency.",
+    "mode":"simplify",
+    "instructions":"Keep it short"
+  }'
+```
+
 ## Environment
 Copy `.env.example` values into your shell/session:
 - `PORT` (default `8080`)

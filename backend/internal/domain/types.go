@@ -43,6 +43,7 @@ type TaskResponse struct {
 type Metadata struct {
 	Provider        string `json:"provider"`
 	ExecutionTimeMs int64  `json:"executionTimeMs"`
+	RequestID       string `json:"requestId,omitempty"`
 }
 
 type APIError struct {
