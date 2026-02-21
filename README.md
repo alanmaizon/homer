@@ -2,6 +2,9 @@
 
 Homer is a platform-agnostic, multi-agent text service written in Go.
 
+CI status:
+- GitHub Actions workflow: `.github/workflows/go-ci.yml` (runs `go vet` and `go test` on push/PR)
+
 ## What it does
 - `summarize`: summarizes one or more documents
 - `rewrite`: rewrites text in a selected mode
