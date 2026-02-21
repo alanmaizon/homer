@@ -27,6 +27,16 @@ Planner -> Executor -> (Optional) Critic
 Provider (mock, OpenAI, or Gemini)
 ```
 
+## Connector scaffolding
+Connector interfaces and stubs live in `backend/internal/connectors`:
+- `Connector` interface defines import/export operations
+- `NoopConnector` keeps core API independent from integrations
+- `GoogleDocsConnector` is scaffolded with TODOs for OAuth and Docs API read/write flows
+
+Current status:
+- Core `/api/task` flow does not require any connector and works independently
+- Google Docs connector is intentionally non-functional scaffold (`ErrNotImplemented`) until OAuth/API wiring is added
+
 ## Request shape
 `POST /api/task`
 
@@ -99,6 +109,8 @@ Copy `.env.example` values into your shell/session:
 - `OPENAI_MODEL` (default `gpt-4o-mini`)
 - `GEMINI_API_KEY` or `GOOGLE_API_KEY` (required when provider is `gemini`)
 - `GEMINI_MODEL` (default `gemini-2.5-flash`)
+- `CONNECTOR_PROVIDER` (`none` or `google_docs`; default `none`)
+- `GOOGLE_CLIENT_ID` (required when `CONNECTOR_PROVIDER=google_docs`)
 
 Example Gemini setup:
 
