@@ -39,7 +39,7 @@ func (o *OpenAIProvider) Name() string {
 
 func (o *OpenAIProvider) Summarize(ctx context.Context, docs []domain.Document, style string, instructions string) (string, error) {
 	var builder strings.Builder
-	builder.WriteString("Summarize the documents for a Microsoft Word user.\n")
+	builder.WriteString("Summarize the provided documents for the end user.\n")
 	if style != "" {
 		builder.WriteString("Style: " + style + "\n")
 	}
