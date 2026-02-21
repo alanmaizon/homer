@@ -44,3 +44,13 @@ type Metadata struct {
 	Provider        string `json:"provider"`
 	ExecutionTimeMs int64  `json:"executionTimeMs"`
 }
+
+type APIError struct {
+	Code      string `json:"code"`
+	Message   string `json:"message"`
+	RequestID string `json:"requestId,omitempty"`
+}
+
+type APIErrorResponse struct {
+	Error APIError `json:"error"`
+}

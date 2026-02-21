@@ -44,6 +44,19 @@ Notes:
 - `documents` required for `summarize`
 - `text` required for `rewrite`
 
+## Error response
+Validation and runtime errors return:
+
+```json
+{
+  "error": {
+    "code": "missing_text",
+    "message": "text is required for rewrite",
+    "requestId": "4e11fe43-e81c-40e8-b5cf-f9d4f0a65fe6"
+  }
+}
+```
+
 ## Environment
 Copy `.env.example` values into your shell/session:
 - `PORT` (default `8080`)
