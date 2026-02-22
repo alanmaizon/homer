@@ -28,7 +28,7 @@ func RegisterRoutes(router *gin.Engine) {
 		requestedConnector := envOrDefault("CONNECTOR_PROVIDER", "none")
 
 		activeProvider := llm.CurrentProvider().Name()
-		activeConnector := connectors.NewConnectorFromEnv().Name()
+		activeConnector := newConnectorFromEnv().Name()
 
 		c.JSON(http.StatusOK, domain.CapabilitiesResponse{
 			Runtime: domain.RuntimeCapabilities{
@@ -48,7 +48,7 @@ func RegisterRoutes(router *gin.Engine) {
 	})
 
 	router.GET("/api/connectors/google_docs/auth/start", func(c *gin.Context) {
-		manager, err := connectors.NewGoogleDocsOAuthManagerFromEnv(connectors.OAuthStore())
+		manager, err := newGoogleDocsOAuthManagerFromEnv(connectors.OAuthStore())
 		if err != nil {
 			writeError(c, http.StatusServiceUnavailable, "connector_service_unavailable", "google docs oauth is not configured")
 			return
@@ -69,7 +69,7 @@ func RegisterRoutes(router *gin.Engine) {
 	})
 
 	router.GET("/api/connectors/google_docs/auth/callback", func(c *gin.Context) {
-		manager, err := connectors.NewGoogleDocsOAuthManagerFromEnv(connectors.OAuthStore())
+		manager, err := newGoogleDocsOAuthManagerFromEnv(connectors.OAuthStore())
 		if err != nil {
 			writeError(c, http.StatusServiceUnavailable, "connector_service_unavailable", "google docs oauth is not configured")
 			return
@@ -165,7 +165,7 @@ func RegisterRoutes(router *gin.Engine) {
 			return
 		}
 
-		connector := connectors.NewConnectorFromEnv()
+		connector := newConnectorFromEnv()
 		if connector.Name() == "none" {
 			writeError(c, http.StatusBadRequest, "connector_unavailable", "no connector is configured")
 			return
@@ -228,7 +228,7 @@ func RegisterRoutes(router *gin.Engine) {
 			return
 		}
 
-		connector := connectors.NewConnectorFromEnv()
+		connector := newConnectorFromEnv()
 		if connector.Name() == "none" {
 			writeError(c, http.StatusBadRequest, "connector_unavailable", "no connector is configured")
 			return
