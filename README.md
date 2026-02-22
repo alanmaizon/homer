@@ -11,6 +11,7 @@ CI status:
 - Uses explicit agent orchestration: **Planner -> Executor -> Critic (optional)**
 - Exposes HTTP API endpoints:
   - `GET /api/health`
+  - `GET /api/capabilities`
   - `POST /api/task`
 
 ## Architecture
@@ -74,6 +75,12 @@ Validation and runtime errors return:
 - OpenAPI: `backend/openapi.yaml`
 
 ## Examples
+Capabilities:
+
+```bash
+curl -sS http://localhost:8080/api/capabilities
+```
+
 Summarize:
 
 ```bash

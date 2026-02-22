@@ -28,6 +28,22 @@ type taskEnvelope struct {
 	} `json:"metadata"`
 }
 
+type capabilitiesEnvelope struct {
+	Runtime struct {
+		RequestedProvider  string `json:"requestedProvider"`
+		ActiveProvider     string `json:"activeProvider"`
+		ProviderFallback   bool   `json:"providerFallback"`
+		RequestedConnector string `json:"requestedConnector"`
+		ActiveConnector    string `json:"activeConnector"`
+		ConnectorFallback  bool   `json:"connectorFallback"`
+	} `json:"runtime"`
+	Features struct {
+		Critic          bool `json:"critic"`
+		ConnectorImport bool `json:"connectorImport"`
+		ConnectorExport bool `json:"connectorExport"`
+	} `json:"features"`
+}
+
 func testRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
@@ -47,6 +63,79 @@ func TestHealth(t *testing.T) {
 	}
 	if strings.TrimSpace(res.Body.String()) != "{\"ok\":true}" {
 		t.Fatalf("unexpected body: %s", res.Body.String())
+	}
+}
+
+func TestCapabilitiesDefault(t *testing.T) {
+	t.Setenv("LLM_PROVIDER", "mock")
+	t.Setenv("CONNECTOR_PROVIDER", "none")
+	llm.SetProvider(llm.NewMockProvider())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/capabilities", nil)
+	res := httptest.NewRecorder()
+
+	testRouter().ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+
+	var payload capabilitiesEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if payload.Runtime.RequestedProvider != "mock" || payload.Runtime.ActiveProvider != "mock" {
+		t.Fatalf("unexpected provider runtime payload: %+v", payload.Runtime)
+	}
+	if payload.Runtime.ProviderFallback {
+		t.Fatalf("expected provider fallback=false")
+	}
+	if payload.Runtime.RequestedConnector != "none" || payload.Runtime.ActiveConnector != "none" {
+		t.Fatalf("unexpected connector runtime payload: %+v", payload.Runtime)
+	}
+	if payload.Runtime.ConnectorFallback {
+		t.Fatalf("expected connector fallback=false")
+	}
+	if !payload.Features.Critic {
+		t.Fatalf("expected critic feature enabled")
+	}
+	if payload.Features.ConnectorImport || payload.Features.ConnectorExport {
+		t.Fatalf("expected connector import/export features disabled")
+	}
+}
+
+func TestCapabilitiesFallbackVisibility(t *testing.T) {
+	t.Setenv("LLM_PROVIDER", "openai")
+	t.Setenv("CONNECTOR_PROVIDER", "google_docs")
+	t.Setenv("GOOGLE_CLIENT_ID", "")
+	llm.SetProvider(llm.NewMockProvider())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/capabilities", nil)
+	res := httptest.NewRecorder()
+
+	testRouter().ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+
+	var payload capabilitiesEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if payload.Runtime.RequestedProvider != "openai" || payload.Runtime.ActiveProvider != "mock" {
+		t.Fatalf("unexpected provider runtime payload: %+v", payload.Runtime)
+	}
+	if !payload.Runtime.ProviderFallback {
+		t.Fatalf("expected provider fallback=true")
+	}
+	if payload.Runtime.RequestedConnector != "google_docs" || payload.Runtime.ActiveConnector != "none" {
+		t.Fatalf("unexpected connector runtime payload: %+v", payload.Runtime)
+	}
+	if !payload.Runtime.ConnectorFallback {
+		t.Fatalf("expected connector fallback=true")
 	}
 }
 

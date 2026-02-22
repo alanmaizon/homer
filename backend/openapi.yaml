@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: Homer API
-  version: 0.2.0
+  version: 0.3.0
   description: Platform-agnostic multi-agent text service.
 servers:
   - url: http://localhost:8080
@@ -24,6 +24,17 @@ paths:
                     type: boolean
               example:
                 ok: true
+  /api/capabilities:
+    get:
+      summary: Runtime capabilities
+      operationId: getCapabilities
+      responses:
+        "200":
+          description: Active runtime capabilities and fallback visibility
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CapabilitiesResponse"
   /api/task:
     post:
       summary: Run summarize or rewrite task
@@ -192,3 +203,55 @@ components:
       properties:
         error:
           $ref: "#/components/schemas/APIError"
+    CapabilitiesResponse:
+      type: object
+      required:
+        - runtime
+        - features
+      properties:
+        runtime:
+          $ref: "#/components/schemas/RuntimeCapabilities"
+        features:
+          $ref: "#/components/schemas/FeatureFlags"
+    RuntimeCapabilities:
+      type: object
+      required:
+        - requestedProvider
+        - activeProvider
+        - providerFallback
+        - requestedConnector
+        - activeConnector
+        - connectorFallback
+      properties:
+        requestedProvider:
+          type: string
+        activeProvider:
+          type: string
+          enum:
+            - mock
+            - openai
+            - gemini
+        providerFallback:
+          type: boolean
+        requestedConnector:
+          type: string
+        activeConnector:
+          type: string
+          enum:
+            - none
+            - google_docs
+        connectorFallback:
+          type: boolean
+    FeatureFlags:
+      type: object
+      required:
+        - critic
+        - connectorImport
+        - connectorExport
+      properties:
+        critic:
+          type: boolean
+        connectorImport:
+          type: boolean
+        connectorExport:
+          type: boolean

@@ -2,10 +2,13 @@ package api
 
 import (
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/alanmaizon/homer/backend/internal/agents"
+	"github.com/alanmaizon/homer/backend/internal/connectors"
 	"github.com/alanmaizon/homer/backend/internal/domain"
+	"github.com/alanmaizon/homer/backend/internal/llm"
 	"github.com/alanmaizon/homer/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -13,6 +16,30 @@ import (
 func RegisterRoutes(router *gin.Engine) {
 	router.GET("/api/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	router.GET("/api/capabilities", func(c *gin.Context) {
+		requestedProvider := envOrDefault("LLM_PROVIDER", "mock")
+		requestedConnector := envOrDefault("CONNECTOR_PROVIDER", "none")
+
+		activeProvider := llm.CurrentProvider().Name()
+		activeConnector := connectors.NewConnectorFromEnv().Name()
+
+		c.JSON(http.StatusOK, domain.CapabilitiesResponse{
+			Runtime: domain.RuntimeCapabilities{
+				RequestedProvider:  requestedProvider,
+				ActiveProvider:     activeProvider,
+				ProviderFallback:   requestedProvider != activeProvider,
+				RequestedConnector: requestedConnector,
+				ActiveConnector:    activeConnector,
+				ConnectorFallback:  requestedConnector != activeConnector,
+			},
+			Features: domain.FeatureFlags{
+				Critic:          true,
+				ConnectorImport: false,
+				ConnectorExport: false,
+			},
+		})
 	})
 
 	router.POST("/api/task", func(c *gin.Context) {
@@ -77,4 +104,13 @@ func writeError(c *gin.Context, status int, code string, message string) {
 			RequestID: middleware.GetRequestID(c),
 		},
 	})
+}
+
+func envOrDefault(key string, fallback string) string {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+
+	return value
 }

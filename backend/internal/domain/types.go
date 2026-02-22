@@ -55,3 +55,23 @@ type APIError struct {
 type APIErrorResponse struct {
 	Error APIError `json:"error"`
 }
+
+type CapabilitiesResponse struct {
+	Runtime  RuntimeCapabilities `json:"runtime"`
+	Features FeatureFlags        `json:"features"`
+}
+
+type RuntimeCapabilities struct {
+	RequestedProvider  string `json:"requestedProvider"`
+	ActiveProvider     string `json:"activeProvider"`
+	ProviderFallback   bool   `json:"providerFallback"`
+	RequestedConnector string `json:"requestedConnector"`
+	ActiveConnector    string `json:"activeConnector"`
+	ConnectorFallback  bool   `json:"connectorFallback"`
+}
+
+type FeatureFlags struct {
+	Critic          bool `json:"critic"`
+	ConnectorImport bool `json:"connectorImport"`
+	ConnectorExport bool `json:"connectorExport"`
+}
