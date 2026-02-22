@@ -30,15 +30,15 @@ Planner -> Executor -> (Optional) Critic
 Provider (mock, OpenAI, or Gemini)
 ```
 
-## Connector scaffolding
-Connector interfaces and stubs live in `backend/internal/connectors`:
+## Connector integration
+Connector implementations live in `backend/internal/connectors`:
 - `Connector` interface defines import/export operations
 - `NoopConnector` keeps core API independent from integrations
-- `GoogleDocsConnector` is scaffolded with TODOs for OAuth and Docs API read/write flows
+- `GoogleDocsConnector` performs Google Docs import/export through Google Docs API
 
 Current status:
 - Core `/api/task` flow does not require any connector and works independently
-- Google Docs connector is intentionally non-functional scaffold (`ErrNotImplemented`) until OAuth/API wiring is added
+- Connector routes use structured errors when connector credentials are missing or invalid
 
 ## Request shape
 `POST /api/task`
@@ -110,7 +110,7 @@ curl -sS -X POST http://localhost:8080/api/task \
   }'
 ```
 
-Connector import (stubbed connector returns `501` until implemented):
+Connector import (requires `CONNECTOR_PROVIDER=google_docs` and credentials):
 
 ```bash
 curl -sS -X POST http://localhost:8080/api/connectors/import \
@@ -131,7 +131,8 @@ Copy `.env.example` values into your shell/session:
 - `GEMINI_API_KEY` or `GOOGLE_API_KEY` (required when provider is `gemini`)
 - `GEMINI_MODEL` (default `gemini-2.5-flash`)
 - `CONNECTOR_PROVIDER` (`none` or `google_docs`; default `none`)
-- `GOOGLE_CLIENT_ID` (required when `CONNECTOR_PROVIDER=google_docs`)
+- `GOOGLE_DOCS_ACCESS_TOKEN` (recommended for local dev connector calls)
+- `GOOGLE_APPLICATION_CREDENTIALS` (alternative service account credentials file path)
 
 Example Gemini setup:
 
@@ -172,6 +173,7 @@ backend/
   cmd/server/main.go
   internal/api/
   internal/agents/
+  internal/connectors/
   internal/domain/
   internal/llm/
   internal/middleware/

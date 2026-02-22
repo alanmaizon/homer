@@ -8,6 +8,7 @@ import (
 )
 
 var ErrNotImplemented = errors.New("connector operation not implemented")
+var ErrUnavailable = errors.New("connector unavailable")
 
 type ImportRequest struct {
 	DocumentID string

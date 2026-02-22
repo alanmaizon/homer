@@ -37,8 +37,8 @@ func RegisterRoutes(router *gin.Engine) {
 			},
 			Features: domain.FeatureFlags{
 				Critic:          true,
-				ConnectorImport: false,
-				ConnectorExport: false,
+				ConnectorImport: activeConnector != "none",
+				ConnectorExport: activeConnector != "none",
 			},
 		})
 	})
@@ -86,6 +86,10 @@ func RegisterRoutes(router *gin.Engine) {
 			DocumentID: req.DocumentID,
 		})
 		if err != nil {
+			if errors.Is(err, connectors.ErrUnavailable) {
+				writeError(c, http.StatusBadRequest, "connector_unavailable", "connector credentials are unavailable")
+				return
+			}
 			if errors.Is(err, connectors.ErrNotImplemented) {
 				writeError(c, http.StatusNotImplemented, "connector_not_implemented", "connector import is not implemented yet")
 				return
@@ -126,6 +130,10 @@ func RegisterRoutes(router *gin.Engine) {
 			Content:    req.Content,
 		})
 		if err != nil {
+			if errors.Is(err, connectors.ErrUnavailable) {
+				writeError(c, http.StatusBadRequest, "connector_unavailable", "connector credentials are unavailable")
+				return
+			}
 			if errors.Is(err, connectors.ErrNotImplemented) {
 				writeError(c, http.StatusNotImplemented, "connector_not_implemented", "connector export is not implemented yet")
 				return
