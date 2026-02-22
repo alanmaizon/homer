@@ -135,6 +135,19 @@ cd backend
 go run ./cmd/server
 ```
 
+## Docker
+Build:
+
+```bash
+docker build -f backend/Dockerfile -t homer-backend:local .
+```
+
+Run with compose:
+
+```bash
+docker compose up --build
+```
+
 ## Test
 ```bash
 cd backend
