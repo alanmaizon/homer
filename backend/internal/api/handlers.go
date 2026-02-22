@@ -96,8 +96,20 @@ func RegisterRoutes(router *gin.Engine) {
 			DocumentID: req.DocumentID,
 		})
 		if err != nil {
+			if errors.Is(err, connectors.ErrUnauthorized) {
+				writeError(c, http.StatusBadGateway, "connector_upstream_unauthorized", "connector upstream credentials are invalid")
+				return
+			}
+			if errors.Is(err, connectors.ErrForbidden) {
+				writeError(c, http.StatusForbidden, "connector_forbidden", "connector access is forbidden for this document")
+				return
+			}
+			if errors.Is(err, connectors.ErrDocumentNotFound) {
+				writeError(c, http.StatusNotFound, "connector_document_not_found", "connector document was not found")
+				return
+			}
 			if errors.Is(err, connectors.ErrUnavailable) {
-				writeError(c, http.StatusBadRequest, "connector_unavailable", "connector credentials are unavailable")
+				writeError(c, http.StatusServiceUnavailable, "connector_service_unavailable", "connector service is unavailable")
 				return
 			}
 			if errors.Is(err, connectors.ErrNotImplemented) {
@@ -147,8 +159,20 @@ func RegisterRoutes(router *gin.Engine) {
 			Content:    req.Content,
 		})
 		if err != nil {
+			if errors.Is(err, connectors.ErrUnauthorized) {
+				writeError(c, http.StatusBadGateway, "connector_upstream_unauthorized", "connector upstream credentials are invalid")
+				return
+			}
+			if errors.Is(err, connectors.ErrForbidden) {
+				writeError(c, http.StatusForbidden, "connector_forbidden", "connector access is forbidden for this document")
+				return
+			}
+			if errors.Is(err, connectors.ErrDocumentNotFound) {
+				writeError(c, http.StatusNotFound, "connector_document_not_found", "connector document was not found")
+				return
+			}
 			if errors.Is(err, connectors.ErrUnavailable) {
-				writeError(c, http.StatusBadRequest, "connector_unavailable", "connector credentials are unavailable")
+				writeError(c, http.StatusServiceUnavailable, "connector_service_unavailable", "connector service is unavailable")
 				return
 			}
 			if errors.Is(err, connectors.ErrNotImplemented) {

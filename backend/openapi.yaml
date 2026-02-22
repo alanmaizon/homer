@@ -67,6 +67,30 @@ paths:
                     error:
                       code: connector_unavailable
                       message: connector credentials are unavailable
+        "403":
+          description: Connector access is forbidden for the target document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                connectorForbidden:
+                  value:
+                    error:
+                      code: connector_forbidden
+                      message: connector access is forbidden for this document
+        "404":
+          description: Connector target document not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                connectorDocumentNotFound:
+                  value:
+                    error:
+                      code: connector_document_not_found
+                      message: connector document was not found
         "401":
           description: Connector request is not authorized
           content:
@@ -79,6 +103,18 @@ paths:
                     error:
                       code: connector_unauthorized
                       message: connector API key is invalid
+        "502":
+          description: Connector upstream credentials are invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                connectorUpstreamUnauthorized:
+                  value:
+                    error:
+                      code: connector_upstream_unauthorized
+                      message: connector upstream credentials are invalid
         "429":
           description: Connector request rate limit exceeded
           content:
@@ -91,6 +127,18 @@ paths:
                     error:
                       code: connector_rate_limited
                       message: connector rate limit exceeded
+        "503":
+          description: Connector upstream service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                connectorServiceUnavailable:
+                  value:
+                    error:
+                      code: connector_service_unavailable
+                      message: connector service is unavailable
         "501":
           description: Connector import not implemented
           content:
@@ -129,6 +177,30 @@ paths:
                     error:
                       code: connector_unavailable
                       message: connector credentials are unavailable
+        "403":
+          description: Connector access is forbidden for the target document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                connectorForbidden:
+                  value:
+                    error:
+                      code: connector_forbidden
+                      message: connector access is forbidden for this document
+        "404":
+          description: Connector target document not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                connectorDocumentNotFound:
+                  value:
+                    error:
+                      code: connector_document_not_found
+                      message: connector document was not found
         "401":
           description: Connector request is not authorized
           content:
@@ -141,6 +213,18 @@ paths:
                     error:
                       code: connector_unauthorized
                       message: connector API key is invalid
+        "502":
+          description: Connector upstream credentials are invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                connectorUpstreamUnauthorized:
+                  value:
+                    error:
+                      code: connector_upstream_unauthorized
+                      message: connector upstream credentials are invalid
         "429":
           description: Connector request rate limit exceeded
           content:
@@ -153,6 +237,18 @@ paths:
                     error:
                       code: connector_rate_limited
                       message: connector rate limit exceeded
+        "503":
+          description: Connector upstream service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                connectorServiceUnavailable:
+                  value:
+                    error:
+                      code: connector_service_unavailable
+                      message: connector service is unavailable
         "501":
           description: Connector export not implemented
           content:

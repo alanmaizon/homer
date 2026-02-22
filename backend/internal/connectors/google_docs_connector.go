@@ -10,6 +10,7 @@ import (
 	"github.com/alanmaizon/homer/backend/internal/domain"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/docs/v1"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 )
 
@@ -56,7 +57,7 @@ func (g *GoogleDocsConnector) ImportDocument(ctx context.Context, req ImportRequ
 
 	document, err := client.GetDocument(ctx, req.DocumentID)
 	if err != nil {
-		return domain.Document{}, err
+		return domain.Document{}, mapGoogleDocsError(err)
 	}
 
 	title := strings.TrimSpace(document.Title)
@@ -79,7 +80,7 @@ func (g *GoogleDocsConnector) ExportContent(ctx context.Context, req ExportReque
 
 	document, err := client.GetDocument(ctx, req.DocumentID)
 	if err != nil {
-		return err
+		return mapGoogleDocsError(err)
 	}
 
 	startIndex, endIndex := editableDocumentRange(document)
@@ -108,7 +109,7 @@ func (g *GoogleDocsConnector) ExportContent(ctx context.Context, req ExportReque
 	_, err = client.BatchUpdate(ctx, req.DocumentID, &docs.BatchUpdateDocumentRequest{
 		Requests: requests,
 	})
-	return err
+	return mapGoogleDocsError(err)
 }
 
 func newGoogleDocsClientFromEnv(ctx context.Context) (googleDocsClient, error) {
@@ -213,4 +214,30 @@ func editableDocumentRange(document *docs.Document) (startIndex int64, endIndex 
 	}
 
 	return startIndex, endIndex
+}
+
+func mapGoogleDocsError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	var apiErr *googleapi.Error
+	if errors.As(err, &apiErr) {
+		switch apiErr.Code {
+		case 401:
+			return fmt.Errorf("%w: %v", ErrUnauthorized, err)
+		case 403:
+			return fmt.Errorf("%w: %v", ErrForbidden, err)
+		case 404:
+			return fmt.Errorf("%w: %v", ErrDocumentNotFound, err)
+		case 429:
+			return fmt.Errorf("%w: %v", ErrUnavailable, err)
+		default:
+			if apiErr.Code >= 500 {
+				return fmt.Errorf("%w: %v", ErrUnavailable, err)
+			}
+		}
+	}
+
+	return err
 }

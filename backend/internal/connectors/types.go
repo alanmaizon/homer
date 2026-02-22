@@ -9,6 +9,9 @@ import (
 
 var ErrNotImplemented = errors.New("connector operation not implemented")
 var ErrUnavailable = errors.New("connector unavailable")
+var ErrUnauthorized = errors.New("connector unauthorized")
+var ErrForbidden = errors.New("connector forbidden")
+var ErrDocumentNotFound = errors.New("connector document not found")
 
 type ImportRequest struct {
 	DocumentID string

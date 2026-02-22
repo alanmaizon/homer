@@ -7,6 +7,7 @@ import (
 
 	"github.com/alanmaizon/homer/backend/internal/domain"
 	"google.golang.org/api/docs/v1"
+	"google.golang.org/api/googleapi"
 )
 
 type fakeGoogleDocsClient struct {
@@ -83,6 +84,45 @@ func TestGoogleDocsImportUnavailable(t *testing.T) {
 	_, err := connector.ImportDocument(context.Background(), ImportRequest{DocumentID: "doc-1"})
 	if !errors.Is(err, ErrUnavailable) {
 		t.Fatalf("expected ErrUnavailable, got %v", err)
+	}
+}
+
+func TestGoogleDocsImportNotFound(t *testing.T) {
+	client := &fakeGoogleDocsClient{
+		getErr: &googleapi.Error{Code: 404, Message: "not found"},
+	}
+	connector := &GoogleDocsConnector{
+		newClient: func(_ context.Context) (googleDocsClient, error) {
+			return client, nil
+		},
+	}
+
+	_, err := connector.ImportDocument(context.Background(), ImportRequest{DocumentID: "missing"})
+	if !errors.Is(err, ErrDocumentNotFound) {
+		t.Fatalf("expected ErrDocumentNotFound, got %v", err)
+	}
+}
+
+func TestGoogleDocsExportForbidden(t *testing.T) {
+	client := &fakeGoogleDocsClient{
+		document: &docs.Document{
+			Body: &docs.Body{
+				Content: []*docs.StructuralElement{
+					{EndIndex: 1},
+				},
+			},
+		},
+		batchErr: &googleapi.Error{Code: 403, Message: "forbidden"},
+	}
+	connector := &GoogleDocsConnector{
+		newClient: func(_ context.Context) (googleDocsClient, error) {
+			return client, nil
+		},
+	}
+
+	err := connector.ExportContent(context.Background(), ExportRequest{DocumentID: "doc", Content: "x"})
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatalf("expected ErrForbidden, got %v", err)
 	}
 }
 

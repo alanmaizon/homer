@@ -73,6 +73,13 @@ Validation and runtime errors return:
 }
 ```
 
+Connector routes may additionally return:
+- `403 connector_forbidden`
+- `404 connector_document_not_found`
+- `429 connector_rate_limited`
+- `502 connector_upstream_unauthorized`
+- `503 connector_service_unavailable`
+
 ## API spec
 - OpenAPI: `backend/openapi.yaml`
 
