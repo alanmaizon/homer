@@ -241,6 +241,50 @@ Run with compose:
 docker compose up --build
 ```
 
+## Cloud Run deploy
+Deployment script:
+- `scripts/gcp/deploy_cloud_run.sh`
+
+Runtime env template:
+- `deploy/cloudrun.env.template`
+
+IAM and API prerequisites:
+1. Enable APIs: Cloud Run, Artifact Registry, IAM.
+2. Deploy identity roles:
+   - `roles/run.admin`
+   - `roles/artifactregistry.writer`
+   - `roles/iam.serviceAccountUser` (for the runtime service account)
+3. Runtime service account should have access to any secrets/APIs required by your selected provider mode.
+
+One-command deploy:
+
+```bash
+GCP_PROJECT_ID=my-project \
+GCP_REGION=us-central1 \
+CLOUD_RUN_SERVICE=homer-backend \
+IMAGE_REPO=homer \
+CLOUD_RUN_ENV_FILE=deploy/cloudrun.env.template \
+./scripts/gcp/deploy_cloud_run.sh
+```
+
+Post-deploy smoke checks:
+
+```bash
+SERVICE_URL="$(gcloud run services describe homer-backend --project my-project --region us-central1 --format='value(status.url)')"
+curl -fsS "${SERVICE_URL}/api/health"
+curl -fsS "${SERVICE_URL}/api/capabilities"
+```
+
+Runtime config matrix:
+
+| Mode | Required runtime env vars | Notes |
+| --- | --- | --- |
+| Mock only | `LLM_PROVIDER=mock`, `CONNECTOR_PROVIDER=none` | Fastest smoke-test mode |
+| OpenAI no connector | `LLM_PROVIDER=openai`, `OPENAI_API_KEY`, `CONNECTOR_PROVIDER=none` | Set optional `OPENAI_MODEL` |
+| Gemini no connector | `LLM_PROVIDER=gemini`, `GEMINI_API_KEY` (or `GOOGLE_API_KEY`), `CONNECTOR_PROVIDER=none` | Set optional `GEMINI_MODEL` |
+| Google Docs via env token | `CONNECTOR_PROVIDER=google_docs`, `GOOGLE_DOCS_ACCESS_TOKEN` | Good for quick non-user OAuth testing |
+| Google Docs via OAuth | `CONNECTOR_PROVIDER=google_docs`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URL` | Use `/api/connectors/google_docs/auth/start` and callback flow |
+
 ## Test
 ```bash
 cd backend
@@ -259,4 +303,8 @@ backend/
   internal/domain/
   internal/llm/
   internal/middleware/
+deploy/
+  cloudrun.env.template
+scripts/gcp/
+  deploy_cloud_run.sh
 ```
