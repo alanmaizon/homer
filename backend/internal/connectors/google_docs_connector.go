@@ -15,7 +15,7 @@ import (
 )
 
 type GoogleDocsConnector struct {
-	newClient func(ctx context.Context) (googleDocsClient, error)
+	newClient func(ctx context.Context, sessionKey string) (googleDocsClient, error)
 }
 
 type googleDocsClient interface {
@@ -37,11 +37,13 @@ func (c *googleDocsAPIClient) BatchUpdate(ctx context.Context, documentID string
 
 func NewGoogleDocsConnectorFromEnv() (*GoogleDocsConnector, error) {
 	if !hasGoogleDocsCredentials() {
-		return nil, errors.New("GOOGLE_DOCS_ACCESS_TOKEN or GOOGLE_APPLICATION_CREDENTIALS is required")
+		return nil, errors.New("connector credentials are unavailable")
 	}
 
 	return &GoogleDocsConnector{
-		newClient: newGoogleDocsClientFromEnv,
+		newClient: func(ctx context.Context, sessionKey string) (googleDocsClient, error) {
+			return newGoogleDocsClientFromEnv(ctx, sessionKey, OAuthStore())
+		},
 	}, nil
 }
 
@@ -50,7 +52,7 @@ func (g *GoogleDocsConnector) Name() string {
 }
 
 func (g *GoogleDocsConnector) ImportDocument(ctx context.Context, req ImportRequest) (domain.Document, error) {
-	client, err := g.newClient(ctx)
+	client, err := g.newClient(ctx, req.SessionKey)
 	if err != nil {
 		return domain.Document{}, err
 	}
@@ -73,7 +75,7 @@ func (g *GoogleDocsConnector) ImportDocument(ctx context.Context, req ImportRequ
 }
 
 func (g *GoogleDocsConnector) ExportContent(ctx context.Context, req ExportRequest) error {
-	client, err := g.newClient(ctx)
+	client, err := g.newClient(ctx, req.SessionKey)
 	if err != nil {
 		return err
 	}
@@ -112,25 +114,31 @@ func (g *GoogleDocsConnector) ExportContent(ctx context.Context, req ExportReque
 	return mapGoogleDocsError(err)
 }
 
-func newGoogleDocsClientFromEnv(ctx context.Context) (googleDocsClient, error) {
+func newGoogleDocsClientFromEnv(ctx context.Context, sessionKey string, store OAuthTokenStore) (googleDocsClient, error) {
+	if tokenSource, ok := newSessionTokenSource(ctx, strings.TrimSpace(sessionKey), store); ok {
+		return newGoogleDocsClient(ctx, option.WithTokenSource(tokenSource))
+	}
+
 	token := strings.TrimSpace(os.Getenv("GOOGLE_DOCS_ACCESS_TOKEN"))
 	credentialsFile := strings.TrimSpace(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"))
 	if token == "" && credentialsFile == "" {
-		return nil, fmt.Errorf("%w: set GOOGLE_DOCS_ACCESS_TOKEN or GOOGLE_APPLICATION_CREDENTIALS", ErrUnavailable)
+		return nil, fmt.Errorf("%w: set X-Connector-Session from OAuth flow or GOOGLE_DOCS_ACCESS_TOKEN/GOOGLE_APPLICATION_CREDENTIALS", ErrUnavailable)
 	}
-
-	opts := []option.ClientOption{option.WithScopes(docs.DocumentsScope)}
 
 	switch {
 	case token != "":
-		opts = append(opts, option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{
+		return newGoogleDocsClient(ctx, option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{
 			AccessToken: token,
 		})))
 	case credentialsFile != "":
-		opts = append(opts, option.WithCredentialsFile(credentialsFile))
+		return newGoogleDocsClient(ctx, option.WithCredentialsFile(credentialsFile))
 	}
 
-	service, err := docs.NewService(ctx, opts...)
+	return nil, fmt.Errorf("%w: invalid Google Docs connector credentials", ErrUnavailable)
+}
+
+func newGoogleDocsClient(ctx context.Context, opt option.ClientOption) (googleDocsClient, error) {
+	service, err := docs.NewService(ctx, option.WithScopes(docs.DocumentsScope), opt)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrUnavailable, err)
 	}
@@ -138,9 +146,48 @@ func newGoogleDocsClientFromEnv(ctx context.Context) (googleDocsClient, error) {
 	return &googleDocsAPIClient{service: service}, nil
 }
 
+func newSessionTokenSource(ctx context.Context, sessionKey string, store OAuthTokenStore) (oauth2.TokenSource, bool) {
+	if sessionKey == "" || store == nil {
+		return nil, false
+	}
+
+	token, ok := store.Token(sessionKey)
+	if !ok || token == nil {
+		return nil, false
+	}
+
+	source := oauth2.StaticTokenSource(token)
+	if config, err := newGoogleDocsOAuthConfigFromEnv(); err == nil {
+		source = config.TokenSource(ctx, token)
+	}
+
+	return &persistingTokenSource{
+		sessionKey: sessionKey,
+		store:      store,
+		source:     source,
+	}, true
+}
+
+type persistingTokenSource struct {
+	sessionKey string
+	store      OAuthTokenStore
+	source     oauth2.TokenSource
+}
+
+func (p *persistingTokenSource) Token() (*oauth2.Token, error) {
+	token, err := p.source.Token()
+	if err != nil {
+		return nil, err
+	}
+
+	p.store.SaveToken(p.sessionKey, token)
+	return token, nil
+}
+
 func hasGoogleDocsCredentials() bool {
 	return strings.TrimSpace(os.Getenv("GOOGLE_DOCS_ACCESS_TOKEN")) != "" ||
-		strings.TrimSpace(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) != ""
+		strings.TrimSpace(os.Getenv("GOOGLE_APPLICATION_CREDENTIALS")) != "" ||
+		hasGoogleDocsOAuthConfig()
 }
 
 func extractDocumentText(document *docs.Document) string {

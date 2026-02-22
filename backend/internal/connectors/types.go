@@ -15,11 +15,13 @@ var ErrDocumentNotFound = errors.New("connector document not found")
 
 type ImportRequest struct {
 	DocumentID string
+	SessionKey string
 }
 
 type ExportRequest struct {
 	DocumentID string
 	Content    string
+	SessionKey string
 }
 
 // Connector abstracts document source/destination integrations.

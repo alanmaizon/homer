@@ -80,6 +80,20 @@ type ConnectorImportRequest struct {
 	DocumentID string `json:"documentId"`
 }
 
+type ConnectorAuthStartResponse struct {
+	Connector      string `json:"connector"`
+	SessionKey     string `json:"sessionKey"`
+	AuthURL        string `json:"authUrl"`
+	StateExpiresAt string `json:"stateExpiresAt"`
+}
+
+type ConnectorAuthCallbackResponse struct {
+	Connector     string `json:"connector"`
+	SessionKey    string `json:"sessionKey"`
+	Authenticated bool   `json:"authenticated"`
+	ExpiresAt     string `json:"expiresAt,omitempty"`
+}
+
 type ConnectorImportResponse struct {
 	Connector string   `json:"connector"`
 	Document  Document `json:"document"`

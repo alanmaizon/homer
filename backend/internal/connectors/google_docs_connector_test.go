@@ -54,7 +54,7 @@ func TestGoogleDocsImportDocument(t *testing.T) {
 	}
 
 	connector := &GoogleDocsConnector{
-		newClient: func(_ context.Context) (googleDocsClient, error) {
+		newClient: func(_ context.Context, _ string) (googleDocsClient, error) {
 			return client, nil
 		},
 	}
@@ -76,7 +76,7 @@ func TestGoogleDocsImportDocument(t *testing.T) {
 
 func TestGoogleDocsImportUnavailable(t *testing.T) {
 	connector := &GoogleDocsConnector{
-		newClient: func(_ context.Context) (googleDocsClient, error) {
+		newClient: func(_ context.Context, _ string) (googleDocsClient, error) {
 			return nil, ErrUnavailable
 		},
 	}
@@ -92,7 +92,7 @@ func TestGoogleDocsImportNotFound(t *testing.T) {
 		getErr: &googleapi.Error{Code: 404, Message: "not found"},
 	}
 	connector := &GoogleDocsConnector{
-		newClient: func(_ context.Context) (googleDocsClient, error) {
+		newClient: func(_ context.Context, _ string) (googleDocsClient, error) {
 			return client, nil
 		},
 	}
@@ -115,7 +115,7 @@ func TestGoogleDocsExportForbidden(t *testing.T) {
 		batchErr: &googleapi.Error{Code: 403, Message: "forbidden"},
 	}
 	connector := &GoogleDocsConnector{
-		newClient: func(_ context.Context) (googleDocsClient, error) {
+		newClient: func(_ context.Context, _ string) (googleDocsClient, error) {
 			return client, nil
 		},
 	}
@@ -139,7 +139,7 @@ func TestGoogleDocsExportContent(t *testing.T) {
 	}
 
 	connector := &GoogleDocsConnector{
-		newClient: func(_ context.Context) (googleDocsClient, error) {
+		newClient: func(_ context.Context, _ string) (googleDocsClient, error) {
 			return client, nil
 		},
 	}
@@ -187,7 +187,7 @@ func TestGoogleDocsExportContentEmptyDoc(t *testing.T) {
 	}
 
 	connector := &GoogleDocsConnector{
-		newClient: func(_ context.Context) (googleDocsClient, error) {
+		newClient: func(_ context.Context, _ string) (googleDocsClient, error) {
 			return client, nil
 		},
 	}

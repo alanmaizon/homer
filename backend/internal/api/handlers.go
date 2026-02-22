@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/alanmaizon/homer/backend/internal/agents"
 	"github.com/alanmaizon/homer/backend/internal/connectors"
@@ -44,6 +45,84 @@ func RegisterRoutes(router *gin.Engine) {
 				ConnectorExport: activeConnector != "none",
 			},
 		})
+	})
+
+	router.GET("/api/connectors/google_docs/auth/start", func(c *gin.Context) {
+		manager, err := connectors.NewGoogleDocsOAuthManagerFromEnv(connectors.OAuthStore())
+		if err != nil {
+			writeError(c, http.StatusServiceUnavailable, "connector_service_unavailable", "google docs oauth is not configured")
+			return
+		}
+
+		result, err := manager.StartAuth()
+		if err != nil {
+			writeError(c, http.StatusServiceUnavailable, "connector_service_unavailable", "failed to initialize google docs oauth")
+			return
+		}
+
+		c.JSON(http.StatusOK, domain.ConnectorAuthStartResponse{
+			Connector:      "google_docs",
+			SessionKey:     result.SessionKey,
+			AuthURL:        result.AuthURL,
+			StateExpiresAt: result.StateExpiresAt.UTC().Format(time.RFC3339),
+		})
+	})
+
+	router.GET("/api/connectors/google_docs/auth/callback", func(c *gin.Context) {
+		manager, err := connectors.NewGoogleDocsOAuthManagerFromEnv(connectors.OAuthStore())
+		if err != nil {
+			writeError(c, http.StatusServiceUnavailable, "connector_service_unavailable", "google docs oauth is not configured")
+			return
+		}
+
+		if oauthErr := strings.TrimSpace(c.Query("error")); oauthErr != "" {
+			message := strings.TrimSpace(c.Query("error_description"))
+			if message == "" {
+				message = oauthErr
+			}
+			writeError(c, http.StatusBadRequest, "oauth_access_denied", message)
+			return
+		}
+
+		state := strings.TrimSpace(c.Query("state"))
+		if state == "" {
+			writeError(c, http.StatusBadRequest, "missing_oauth_state", "state is required")
+			return
+		}
+		code := strings.TrimSpace(c.Query("code"))
+		if code == "" {
+			writeError(c, http.StatusBadRequest, "missing_oauth_code", "code is required")
+			return
+		}
+
+		result, err := manager.CompleteAuth(c.Request.Context(), state, code)
+		if err != nil {
+			if errors.Is(err, connectors.ErrOAuthStateInvalid) {
+				writeError(c, http.StatusBadRequest, "invalid_oauth_state", "oauth state is invalid or expired")
+				return
+			}
+			if errors.Is(err, connectors.ErrOAuthExchangeFailed) {
+				writeError(c, http.StatusBadGateway, "oauth_exchange_failed", "oauth code exchange failed")
+				return
+			}
+			if errors.Is(err, connectors.ErrOAuthUnavailable) {
+				writeError(c, http.StatusServiceUnavailable, "connector_service_unavailable", "google docs oauth is not configured")
+				return
+			}
+			writeError(c, http.StatusInternalServerError, "internal_error", err.Error())
+			return
+		}
+
+		response := domain.ConnectorAuthCallbackResponse{
+			Connector:     "google_docs",
+			SessionKey:    result.SessionKey,
+			Authenticated: true,
+		}
+		if result.ExpiresAt != nil {
+			response.ExpiresAt = result.ExpiresAt.UTC().Format(time.RFC3339)
+		}
+
+		c.JSON(http.StatusOK, response)
 	})
 
 	router.POST("/api/task", func(c *gin.Context) {
@@ -94,6 +173,7 @@ func RegisterRoutes(router *gin.Engine) {
 
 		document, err := connector.ImportDocument(c.Request.Context(), connectors.ImportRequest{
 			DocumentID: req.DocumentID,
+			SessionKey: connectorSessionKeyFromRequest(c),
 		})
 		if err != nil {
 			if errors.Is(err, connectors.ErrUnauthorized) {
@@ -157,6 +237,7 @@ func RegisterRoutes(router *gin.Engine) {
 		err := connector.ExportContent(c.Request.Context(), connectors.ExportRequest{
 			DocumentID: req.DocumentID,
 			Content:    req.Content,
+			SessionKey: connectorSessionKeyFromRequest(c),
 		})
 		if err != nil {
 			if errors.Is(err, connectors.ErrUnauthorized) {
@@ -188,6 +269,10 @@ func RegisterRoutes(router *gin.Engine) {
 			Exported:  true,
 		})
 	})
+}
+
+func connectorSessionKeyFromRequest(c *gin.Context) string {
+	return strings.TrimSpace(c.GetHeader("X-Connector-Session"))
 }
 
 func validateTaskRequest(req domain.TaskRequest) *domain.APIError {

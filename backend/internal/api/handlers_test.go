@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
+	"github.com/alanmaizon/homer/backend/internal/connectors"
 	"github.com/alanmaizon/homer/backend/internal/llm"
 	"github.com/alanmaizon/homer/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
@@ -44,12 +46,37 @@ type capabilitiesEnvelope struct {
 	} `json:"features"`
 }
 
+type connectorAuthStartEnvelope struct {
+	Connector      string `json:"connector"`
+	SessionKey     string `json:"sessionKey"`
+	AuthURL        string `json:"authUrl"`
+	StateExpiresAt string `json:"stateExpiresAt"`
+}
+
+type connectorAuthCallbackEnvelope struct {
+	Connector     string `json:"connector"`
+	SessionKey    string `json:"sessionKey"`
+	Authenticated bool   `json:"authenticated"`
+	ExpiresAt     string `json:"expiresAt"`
+}
+
 func testRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.Use(middleware.RequestID())
 	RegisterRoutes(router)
 	return router
+}
+
+func setGoogleOAuthEnvForTest(t *testing.T, authURL string, tokenURL string) {
+	t.Helper()
+	t.Setenv("GOOGLE_OAUTH_CLIENT_ID", "client-id")
+	t.Setenv("GOOGLE_OAUTH_CLIENT_SECRET", "client-secret")
+	t.Setenv("GOOGLE_OAUTH_REDIRECT_URL", "http://localhost:8080/api/connectors/google_docs/auth/callback")
+	t.Setenv("GOOGLE_OAUTH_AUTH_URL", authURL)
+	t.Setenv("GOOGLE_OAUTH_TOKEN_URL", tokenURL)
+	t.Setenv("GOOGLE_OAUTH_SCOPES", "")
+	t.Setenv("GOOGLE_OAUTH_STATE_TTL", "")
 }
 
 func TestHealth(t *testing.T) {
@@ -110,6 +137,9 @@ func TestCapabilitiesFallbackVisibility(t *testing.T) {
 	t.Setenv("CONNECTOR_PROVIDER", "google_docs")
 	t.Setenv("GOOGLE_DOCS_ACCESS_TOKEN", "")
 	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+	t.Setenv("GOOGLE_OAUTH_CLIENT_ID", "")
+	t.Setenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
+	t.Setenv("GOOGLE_OAUTH_REDIRECT_URL", "")
 	llm.SetProvider(llm.NewMockProvider())
 
 	req := httptest.NewRequest(http.MethodGet, "/api/capabilities", nil)
@@ -166,6 +196,199 @@ func TestCapabilitiesConnectorEnabled(t *testing.T) {
 	}
 	if !payload.Features.ConnectorImport || !payload.Features.ConnectorExport {
 		t.Fatalf("expected connector features enabled: %+v", payload.Features)
+	}
+}
+
+func TestGoogleDocsAuthStartOAuthNotConfigured(t *testing.T) {
+	t.Setenv("GOOGLE_OAUTH_CLIENT_ID", "")
+	t.Setenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
+	t.Setenv("GOOGLE_OAUTH_REDIRECT_URL", "")
+	t.Setenv("GOOGLE_OAUTH_AUTH_URL", "")
+	t.Setenv("GOOGLE_OAUTH_TOKEN_URL", "")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/connectors/google_docs/auth/start", nil)
+	res := httptest.NewRecorder()
+
+	testRouter().ServeHTTP(res, req)
+
+	if res.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status 503, got %d", res.Code)
+	}
+
+	var payload errorEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error.Code != "connector_service_unavailable" {
+		t.Fatalf("expected connector_service_unavailable, got %q", payload.Error.Code)
+	}
+}
+
+func TestGoogleDocsAuthStartAndCallbackSuccess(t *testing.T) {
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"access_token":  "oauth-access",
+			"refresh_token": "oauth-refresh",
+			"token_type":    "Bearer",
+			"expires_in":    3600,
+		})
+	}))
+	defer tokenServer.Close()
+
+	restoreStore := connectors.SetOAuthStoreForTests(connectors.NewInMemoryOAuthTokenStore())
+	defer restoreStore()
+	setGoogleOAuthEnvForTest(t, tokenServer.URL+"/auth", tokenServer.URL+"/token")
+
+	startReq := httptest.NewRequest(http.MethodGet, "/api/connectors/google_docs/auth/start", nil)
+	startRes := httptest.NewRecorder()
+	testRouter().ServeHTTP(startRes, startReq)
+
+	if startRes.Code != http.StatusOK {
+		t.Fatalf("expected start status 200, got %d body=%s", startRes.Code, startRes.Body.String())
+	}
+
+	var startPayload connectorAuthStartEnvelope
+	if err := json.Unmarshal(startRes.Body.Bytes(), &startPayload); err != nil {
+		t.Fatalf("failed to decode start response: %v", err)
+	}
+	if startPayload.Connector != "google_docs" {
+		t.Fatalf("expected google_docs connector, got %q", startPayload.Connector)
+	}
+	if startPayload.SessionKey == "" || startPayload.AuthURL == "" || startPayload.StateExpiresAt == "" {
+		t.Fatalf("expected sessionKey/authUrl/stateExpiresAt in start response: %+v", startPayload)
+	}
+
+	authURL, err := url.Parse(startPayload.AuthURL)
+	if err != nil {
+		t.Fatalf("expected valid auth url, got %v", err)
+	}
+	state := strings.TrimSpace(authURL.Query().Get("state"))
+	if state == "" {
+		t.Fatalf("expected state query param in auth url")
+	}
+
+	callbackReq := httptest.NewRequest(http.MethodGet, "/api/connectors/google_docs/auth/callback?state="+url.QueryEscape(state)+"&code=good-code", nil)
+	callbackRes := httptest.NewRecorder()
+	testRouter().ServeHTTP(callbackRes, callbackReq)
+
+	if callbackRes.Code != http.StatusOK {
+		t.Fatalf("expected callback status 200, got %d body=%s", callbackRes.Code, callbackRes.Body.String())
+	}
+
+	var callbackPayload connectorAuthCallbackEnvelope
+	if err := json.Unmarshal(callbackRes.Body.Bytes(), &callbackPayload); err != nil {
+		t.Fatalf("failed to decode callback response: %v", err)
+	}
+	if callbackPayload.SessionKey != startPayload.SessionKey {
+		t.Fatalf("expected session key %q, got %q", startPayload.SessionKey, callbackPayload.SessionKey)
+	}
+	if !callbackPayload.Authenticated {
+		t.Fatalf("expected authenticated=true")
+	}
+
+	token, ok := connectors.OAuthStore().Token(startPayload.SessionKey)
+	if !ok {
+		t.Fatalf("expected oauth token to be stored")
+	}
+	if token.AccessToken != "oauth-access" {
+		t.Fatalf("expected oauth-access, got %q", token.AccessToken)
+	}
+	if token.RefreshToken != "oauth-refresh" {
+		t.Fatalf("expected oauth-refresh, got %q", token.RefreshToken)
+	}
+}
+
+func TestGoogleDocsAuthCallbackInvalidState(t *testing.T) {
+	restoreStore := connectors.SetOAuthStoreForTests(connectors.NewInMemoryOAuthTokenStore())
+	defer restoreStore()
+	setGoogleOAuthEnvForTest(t, "https://accounts.example.com/auth", "https://accounts.example.com/token")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/connectors/google_docs/auth/callback?state=missing&code=abc", nil)
+	res := httptest.NewRecorder()
+
+	testRouter().ServeHTTP(res, req)
+
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", res.Code)
+	}
+
+	var payload errorEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error.Code != "invalid_oauth_state" {
+		t.Fatalf("expected invalid_oauth_state, got %q", payload.Error.Code)
+	}
+}
+
+func TestGoogleDocsAuthCallbackExchangeFailure(t *testing.T) {
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "exchange failed", http.StatusBadGateway)
+	}))
+	defer tokenServer.Close()
+
+	restoreStore := connectors.SetOAuthStoreForTests(connectors.NewInMemoryOAuthTokenStore())
+	defer restoreStore()
+	setGoogleOAuthEnvForTest(t, tokenServer.URL+"/auth", tokenServer.URL+"/token")
+
+	startReq := httptest.NewRequest(http.MethodGet, "/api/connectors/google_docs/auth/start", nil)
+	startRes := httptest.NewRecorder()
+	testRouter().ServeHTTP(startRes, startReq)
+	if startRes.Code != http.StatusOK {
+		t.Fatalf("expected start status 200, got %d", startRes.Code)
+	}
+
+	var startPayload connectorAuthStartEnvelope
+	if err := json.Unmarshal(startRes.Body.Bytes(), &startPayload); err != nil {
+		t.Fatalf("failed to decode start response: %v", err)
+	}
+	authURL, err := url.Parse(startPayload.AuthURL)
+	if err != nil {
+		t.Fatalf("expected valid auth url, got %v", err)
+	}
+	state := strings.TrimSpace(authURL.Query().Get("state"))
+	if state == "" {
+		t.Fatalf("expected state query param")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/connectors/google_docs/auth/callback?state="+url.QueryEscape(state)+"&code=bad-code", nil)
+	res := httptest.NewRecorder()
+	testRouter().ServeHTTP(res, req)
+
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
+	}
+
+	var payload errorEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error.Code != "oauth_exchange_failed" {
+		t.Fatalf("expected oauth_exchange_failed, got %q", payload.Error.Code)
+	}
+}
+
+func TestGoogleDocsAuthCallbackAccessDenied(t *testing.T) {
+	restoreStore := connectors.SetOAuthStoreForTests(connectors.NewInMemoryOAuthTokenStore())
+	defer restoreStore()
+	setGoogleOAuthEnvForTest(t, "https://accounts.example.com/auth", "https://accounts.example.com/token")
+
+	req := httptest.NewRequest(http.MethodGet, "/api/connectors/google_docs/auth/callback?error=access_denied&error_description=user%20denied", nil)
+	res := httptest.NewRecorder()
+
+	testRouter().ServeHTTP(res, req)
+
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", res.Code)
+	}
+
+	var payload errorEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error.Code != "oauth_access_denied" {
+		t.Fatalf("expected oauth_access_denied, got %q", payload.Error.Code)
 	}
 }
 
@@ -241,6 +464,9 @@ func TestConnectorImportCredentialsUnavailable(t *testing.T) {
 	t.Setenv("CONNECTOR_PROVIDER", "google_docs")
 	t.Setenv("GOOGLE_DOCS_ACCESS_TOKEN", "")
 	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+	t.Setenv("GOOGLE_OAUTH_CLIENT_ID", "")
+	t.Setenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
+	t.Setenv("GOOGLE_OAUTH_REDIRECT_URL", "")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/connectors/import", strings.NewReader(`{"documentId":"doc-1"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -319,6 +545,9 @@ func TestConnectorExportCredentialsUnavailable(t *testing.T) {
 	t.Setenv("CONNECTOR_PROVIDER", "google_docs")
 	t.Setenv("GOOGLE_DOCS_ACCESS_TOKEN", "")
 	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+	t.Setenv("GOOGLE_OAUTH_CLIENT_ID", "")
+	t.Setenv("GOOGLE_OAUTH_CLIENT_SECRET", "")
+	t.Setenv("GOOGLE_OAUTH_REDIRECT_URL", "")
 
 	req := httptest.NewRequest(http.MethodPost, "/api/connectors/export", strings.NewReader(`{"documentId":"doc-1","content":"Updated content"}`))
 	req.Header.Set("Content-Type", "application/json")

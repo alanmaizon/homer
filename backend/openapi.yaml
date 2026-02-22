@@ -35,6 +35,111 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CapabilitiesResponse"
+  /api/connectors/google_docs/auth/start:
+    get:
+      summary: Start Google Docs OAuth authorization flow
+      operationId: startGoogleDocsOAuth
+      responses:
+        "200":
+          description: OAuth flow initialized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorAuthStartResponse"
+        "503":
+          description: Google Docs OAuth is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                oauthUnavailable:
+                  value:
+                    error:
+                      code: connector_service_unavailable
+                      message: google docs oauth is not configured
+  /api/connectors/google_docs/auth/callback:
+    get:
+      summary: Complete Google Docs OAuth authorization flow
+      operationId: completeGoogleDocsOAuth
+      parameters:
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+          description: OAuth state returned by Google after consent.
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+          description: OAuth authorization code returned by Google after consent.
+        - name: error
+          in: query
+          required: false
+          schema:
+            type: string
+          description: OAuth provider error.
+        - name: error_description
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Human-readable OAuth provider error message.
+      responses:
+        "200":
+          description: OAuth callback succeeded and token was stored for the session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorAuthCallbackResponse"
+        "400":
+          description: Invalid callback payload or rejected consent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                missingState:
+                  value:
+                    error:
+                      code: missing_oauth_state
+                      message: state is required
+                invalidState:
+                  value:
+                    error:
+                      code: invalid_oauth_state
+                      message: oauth state is invalid or expired
+                accessDenied:
+                  value:
+                    error:
+                      code: oauth_access_denied
+                      message: access_denied
+        "502":
+          description: Authorization code exchange failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                exchangeFailed:
+                  value:
+                    error:
+                      code: oauth_exchange_failed
+                      message: oauth code exchange failed
+        "503":
+          description: Google Docs OAuth is not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                oauthUnavailable:
+                  value:
+                    error:
+                      code: connector_service_unavailable
+                      message: google docs oauth is not configured
   /api/connectors/import:
     post:
       summary: Import document from configured connector
@@ -42,6 +147,8 @@ paths:
       description: Requires `X-Connector-Key` header when `CONNECTOR_API_KEY` is configured.
       security:
         - ConnectorApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/ConnectorSessionHeader"
       requestBody:
         required: true
         content:
@@ -152,6 +259,8 @@ paths:
       description: Requires `X-Connector-Key` header when `CONNECTOR_API_KEY` is configured.
       security:
         - ConnectorApiKey: []
+      parameters:
+        - $ref: "#/components/parameters/ConnectorSessionHeader"
       requestBody:
         required: true
         content:
@@ -318,6 +427,14 @@ components:
       type: apiKey
       in: header
       name: X-Connector-Key
+  parameters:
+    ConnectorSessionHeader:
+      name: X-Connector-Session
+      in: header
+      required: false
+      description: Session key returned by Google Docs OAuth start/callback endpoints.
+      schema:
+        type: string
   schemas:
     Document:
       type: object
@@ -487,6 +604,44 @@ components:
       properties:
         documentId:
           type: string
+    ConnectorAuthStartResponse:
+      type: object
+      required:
+        - connector
+        - sessionKey
+        - authUrl
+        - stateExpiresAt
+      properties:
+        connector:
+          type: string
+          enum:
+            - google_docs
+        sessionKey:
+          type: string
+        authUrl:
+          type: string
+          format: uri
+        stateExpiresAt:
+          type: string
+          format: date-time
+    ConnectorAuthCallbackResponse:
+      type: object
+      required:
+        - connector
+        - sessionKey
+        - authenticated
+      properties:
+        connector:
+          type: string
+          enum:
+            - google_docs
+        sessionKey:
+          type: string
+        authenticated:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
     ConnectorImportResponse:
       type: object
       required:

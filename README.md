@@ -12,6 +12,8 @@ CI status:
 - Exposes HTTP API endpoints:
   - `GET /api/health`
   - `GET /api/capabilities`
+  - `GET /api/connectors/google_docs/auth/start`
+  - `GET /api/connectors/google_docs/auth/callback`
   - `POST /api/connectors/import`
   - `POST /api/connectors/export`
   - `POST /api/task`
@@ -39,6 +41,7 @@ Connector implementations live in `backend/internal/connectors`:
 Current status:
 - Core `/api/task` flow does not require any connector and works independently
 - Connector routes use structured errors when connector credentials are missing or invalid
+- Google Docs connector supports OAuth authorization-code flow with in-memory session token storage
 
 ## Request shape
 `POST /api/task`
@@ -79,6 +82,11 @@ Connector routes may additionally return:
 - `429 connector_rate_limited`
 - `502 connector_upstream_unauthorized`
 - `503 connector_service_unavailable`
+
+OAuth callback routes may additionally return:
+- `400 oauth_access_denied`
+- `400 invalid_oauth_state`
+- `502 oauth_exchange_failed`
 
 ## API spec
 - OpenAPI: `backend/openapi.yaml`
@@ -123,9 +131,22 @@ Connector import (requires `CONNECTOR_PROVIDER=google_docs` and credentials):
 curl -sS -X POST http://localhost:8080/api/connectors/import \
   -H "Content-Type: application/json" \
   -H "X-Connector-Key: ${CONNECTOR_API_KEY}" \
+  -H "X-Connector-Session: ${CONNECTOR_SESSION_KEY}" \
   -d '{
     "documentId":"doc-123"
   }'
+```
+
+Google Docs OAuth start:
+
+```bash
+curl -sS http://localhost:8080/api/connectors/google_docs/auth/start
+```
+
+Google Docs OAuth callback (state and code from provider redirect):
+
+```bash
+curl -sS "http://localhost:8080/api/connectors/google_docs/auth/callback?state=${STATE}&code=${CODE}"
 ```
 
 ## Environment
@@ -143,6 +164,11 @@ Copy `.env.example` values into your shell/session:
 - `CONNECTOR_RATE_LIMIT_PER_MINUTE` (connector route request cap per minute; default `60`, set `0` to disable)
 - `GOOGLE_DOCS_ACCESS_TOKEN` (recommended for local dev connector calls)
 - `GOOGLE_APPLICATION_CREDENTIALS` (alternative service account credentials file path)
+- `GOOGLE_OAUTH_CLIENT_ID` (required for OAuth authorization-code flow)
+- `GOOGLE_OAUTH_CLIENT_SECRET` (required for OAuth authorization-code flow)
+- `GOOGLE_OAUTH_REDIRECT_URL` (required for OAuth authorization-code flow callback)
+- `GOOGLE_OAUTH_SCOPES` (optional comma/space separated scopes; defaults to Google Docs scope)
+- `GOOGLE_OAUTH_STATE_TTL` (optional OAuth state lifetime, default `10m`)
 
 Example Gemini setup:
 

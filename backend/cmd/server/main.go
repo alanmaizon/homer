@@ -22,7 +22,15 @@ func main() {
 			"http://localhost",
 		},
 		AllowMethods: []string{"GET", "POST", "OPTIONS"},
-		AllowHeaders: []string{"Origin", "Content-Type", "Accept", "X-Request-Id"},
+		AllowHeaders: []string{
+			"Origin",
+			"Content-Type",
+			"Accept",
+			"Authorization",
+			"X-Request-Id",
+			"X-Connector-Key",
+			"X-Connector-Session",
+		},
 	}))
 
 	api.RegisterRoutes(router)
