@@ -79,6 +79,18 @@ paths:
                     error:
                       code: connector_unauthorized
                       message: connector API key is invalid
+        "429":
+          description: Connector request rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                connectorRateLimited:
+                  value:
+                    error:
+                      code: connector_rate_limited
+                      message: connector rate limit exceeded
         "501":
           description: Connector import not implemented
           content:
@@ -129,6 +141,18 @@ paths:
                     error:
                       code: connector_unauthorized
                       message: connector API key is invalid
+        "429":
+          description: Connector request rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                connectorRateLimited:
+                  value:
+                    error:
+                      code: connector_rate_limited
+                      message: connector rate limit exceeded
         "501":
           description: Connector export not implemented
           content:

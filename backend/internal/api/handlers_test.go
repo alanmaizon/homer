@@ -261,6 +261,36 @@ func TestConnectorImportCredentialsUnavailable(t *testing.T) {
 	}
 }
 
+func TestConnectorImportRateLimited(t *testing.T) {
+	t.Setenv("CONNECTOR_RATE_LIMIT_PER_MINUTE", "1")
+	t.Setenv("CONNECTOR_PROVIDER", "none")
+	router := testRouter()
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/api/connectors/import", strings.NewReader(`{"documentId":"doc-1"}`))
+	firstReq.Header.Set("Content-Type", "application/json")
+	firstRes := httptest.NewRecorder()
+	router.ServeHTTP(firstRes, firstReq)
+	if firstRes.Code != http.StatusBadRequest {
+		t.Fatalf("expected first status 400, got %d", firstRes.Code)
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/api/connectors/import", strings.NewReader(`{"documentId":"doc-1"}`))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondRes := httptest.NewRecorder()
+	router.ServeHTTP(secondRes, secondReq)
+	if secondRes.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected second status 429, got %d", secondRes.Code)
+	}
+
+	var payload errorEnvelope
+	if err := json.Unmarshal(secondRes.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode second response: %v", err)
+	}
+	if payload.Error.Code != "connector_rate_limited" {
+		t.Fatalf("expected connector_rate_limited, got %q", payload.Error.Code)
+	}
+}
+
 func TestConnectorExportValidation(t *testing.T) {
 	t.Setenv("CONNECTOR_PROVIDER", "google_docs")
 	t.Setenv("GOOGLE_DOCS_ACCESS_TOKEN", "test-token")
@@ -329,6 +359,28 @@ func TestConnectorExportUnauthorizedWhenAPIKeyConfigured(t *testing.T) {
 	}
 	if payload.Error.Code != "connector_unauthorized" {
 		t.Fatalf("expected connector_unauthorized, got %q", payload.Error.Code)
+	}
+}
+
+func TestConnectorExportRateLimitDisabled(t *testing.T) {
+	t.Setenv("CONNECTOR_RATE_LIMIT_PER_MINUTE", "0")
+	t.Setenv("CONNECTOR_PROVIDER", "none")
+	router := testRouter()
+
+	firstReq := httptest.NewRequest(http.MethodPost, "/api/connectors/export", strings.NewReader(`{"documentId":"doc-1","content":"x"}`))
+	firstReq.Header.Set("Content-Type", "application/json")
+	firstRes := httptest.NewRecorder()
+	router.ServeHTTP(firstRes, firstReq)
+	if firstRes.Code != http.StatusBadRequest {
+		t.Fatalf("expected first status 400, got %d", firstRes.Code)
+	}
+
+	secondReq := httptest.NewRequest(http.MethodPost, "/api/connectors/export", strings.NewReader(`{"documentId":"doc-1","content":"x"}`))
+	secondReq.Header.Set("Content-Type", "application/json")
+	secondRes := httptest.NewRecorder()
+	router.ServeHTTP(secondRes, secondReq)
+	if secondRes.Code != http.StatusBadRequest {
+		t.Fatalf("expected second status 400, got %d", secondRes.Code)
 	}
 }
 

@@ -133,6 +133,7 @@ Copy `.env.example` values into your shell/session:
 - `GEMINI_MODEL` (default `gemini-2.5-flash`)
 - `CONNECTOR_PROVIDER` (`none` or `google_docs`; default `none`)
 - `CONNECTOR_API_KEY` (optional; when set, required for connector import/export routes)
+- `CONNECTOR_RATE_LIMIT_PER_MINUTE` (connector route request cap per minute; default `60`, set `0` to disable)
 - `GOOGLE_DOCS_ACCESS_TOKEN` (recommended for local dev connector calls)
 - `GOOGLE_APPLICATION_CREDENTIALS` (alternative service account credentials file path)
 

@@ -16,6 +16,8 @@ import (
 )
 
 func RegisterRoutes(router *gin.Engine) {
+	connectorRateLimiter := newConnectorRateLimiterFromEnv()
+
 	router.GET("/api/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
@@ -70,6 +72,9 @@ func RegisterRoutes(router *gin.Engine) {
 		if !authorizeConnectorRequest(c) {
 			return
 		}
+		if !enforceConnectorRateLimit(c, connectorRateLimiter) {
+			return
+		}
 
 		var req domain.ConnectorImportRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -111,6 +116,9 @@ func RegisterRoutes(router *gin.Engine) {
 
 	router.POST("/api/connectors/export", func(c *gin.Context) {
 		if !authorizeConnectorRequest(c) {
+			return
+		}
+		if !enforceConnectorRateLimit(c, connectorRateLimiter) {
 			return
 		}
 
