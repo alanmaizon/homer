@@ -24,6 +24,17 @@ paths:
                     type: boolean
               example:
                 ok: true
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      operationId: getMetrics
+      responses:
+        "200":
+          description: Prometheus-compatible metric series
+          content:
+            text/plain:
+              schema:
+                type: string
   /api/capabilities:
     get:
       summary: Runtime capabilities

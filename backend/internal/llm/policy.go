@@ -125,3 +125,35 @@ func waitForBackoff(ctx context.Context, attempt int) error {
 		return nil
 	}
 }
+
+func providerErrorCategory(err error) string {
+	if err == nil {
+		return "none"
+	}
+
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "timeout"
+	}
+
+	var httpErr *providerHTTPError
+	if errors.As(err, &httpErr) {
+		switch {
+		case httpErr.statusCode == 429:
+			return "rate_limited"
+		case httpErr.statusCode >= 500:
+			return "http_5xx"
+		case httpErr.statusCode >= 400:
+			return "http_4xx"
+		}
+	}
+
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		if netErr.Timeout() {
+			return "timeout"
+		}
+		return "network"
+	}
+
+	return "unknown"
+}

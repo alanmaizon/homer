@@ -10,6 +10,7 @@ import (
 
 	"github.com/alanmaizon/homer/backend/internal/connectors"
 	"github.com/alanmaizon/homer/backend/internal/llm"
+	"github.com/alanmaizon/homer/backend/internal/metrics"
 	"github.com/alanmaizon/homer/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -90,6 +91,58 @@ func TestHealth(t *testing.T) {
 	}
 	if strings.TrimSpace(res.Body.String()) != "{\"ok\":true}" {
 		t.Fatalf("unexpected body: %s", res.Body.String())
+	}
+}
+
+func TestMetricsEndpointIncludesProviderAndConnectorSeries(t *testing.T) {
+	metrics.ResetForTests()
+	t.Cleanup(metrics.ResetForTests)
+	llm.SetProvider(llm.NewMockProvider())
+	setConnectorFactoryForTest(t, &stubConnector{name: "none"})
+
+	router := testRouter()
+
+	taskReq := httptest.NewRequest(http.MethodPost, "/api/task", strings.NewReader(`{
+		"task":"rewrite",
+		"text":"hello world",
+		"mode":"simplify"
+	}`))
+	taskReq.Header.Set("Content-Type", "application/json")
+	taskRes := httptest.NewRecorder()
+	router.ServeHTTP(taskRes, taskReq)
+	if taskRes.Code != http.StatusOK {
+		t.Fatalf("expected task status 200, got %d body=%s", taskRes.Code, taskRes.Body.String())
+	}
+
+	connectorReq := httptest.NewRequest(http.MethodPost, "/api/connectors/import", strings.NewReader(`{"documentId":"doc-1"}`))
+	connectorReq.Header.Set("Content-Type", "application/json")
+	connectorRes := httptest.NewRecorder()
+	router.ServeHTTP(connectorRes, connectorReq)
+	if connectorRes.Code != http.StatusBadRequest {
+		t.Fatalf("expected connector status 400, got %d body=%s", connectorRes.Code, connectorRes.Body.String())
+	}
+
+	metricsReq := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	metricsRes := httptest.NewRecorder()
+	router.ServeHTTP(metricsRes, metricsReq)
+	if metricsRes.Code != http.StatusOK {
+		t.Fatalf("expected metrics status 200, got %d", metricsRes.Code)
+	}
+
+	body := metricsRes.Body.String()
+	required := []string{
+		"homer_provider_requests_total",
+		"provider=\"mock\"",
+		"operation=\"rewrite\"",
+		"homer_connector_requests_total",
+		"connector=\"none\"",
+		"operation=\"import\"",
+		"error_code=\"connector_unavailable\"",
+	}
+	for _, token := range required {
+		if !strings.Contains(body, token) {
+			t.Fatalf("expected metrics output to contain %q\n%s", token, body)
+		}
 	}
 }
 

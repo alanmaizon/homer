@@ -56,24 +56,28 @@ func (g *GeminiProvider) Name() string {
 }
 
 func (g *GeminiProvider) Summarize(ctx context.Context, docs []domain.Document, style string, instructions string) (string, error) {
-	var builder strings.Builder
-	builder.WriteString("Summarize the provided documents for the end user.\n")
-	if style != "" {
-		builder.WriteString("Style: " + style + "\n")
-	}
-	if instructions != "" {
-		builder.WriteString("Instructions: " + instructions + "\n")
-	}
-	for _, doc := range docs {
-		builder.WriteString("\n# " + doc.Title + "\n")
-		builder.WriteString(doc.Content + "\n")
-	}
-	return g.call(ctx, builder.String())
+	return observeProviderOperation(ctx, g.Name(), "summarize", func() (string, error) {
+		var builder strings.Builder
+		builder.WriteString("Summarize the provided documents for the end user.\n")
+		if style != "" {
+			builder.WriteString("Style: " + style + "\n")
+		}
+		if instructions != "" {
+			builder.WriteString("Instructions: " + instructions + "\n")
+		}
+		for _, doc := range docs {
+			builder.WriteString("\n# " + doc.Title + "\n")
+			builder.WriteString(doc.Content + "\n")
+		}
+		return g.call(ctx, builder.String())
+	})
 }
 
 func (g *GeminiProvider) Rewrite(ctx context.Context, text string, mode string, instructions string) (string, error) {
-	prompt := fmt.Sprintf("Rewrite this text in %s mode.\nInstructions: %s\n\n%s", mode, instructions, text)
-	return g.call(ctx, prompt)
+	return observeProviderOperation(ctx, g.Name(), "rewrite", func() (string, error) {
+		prompt := fmt.Sprintf("Rewrite this text in %s mode.\nInstructions: %s\n\n%s", mode, instructions, text)
+		return g.call(ctx, prompt)
+	})
 }
 
 func (g *GeminiProvider) call(ctx context.Context, prompt string) (string, error) {

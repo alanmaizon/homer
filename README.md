@@ -11,6 +11,7 @@ CI status:
 - Uses explicit agent orchestration: **Planner -> Executor -> Critic (optional)**
 - Exposes HTTP API endpoints:
   - `GET /api/health`
+  - `GET /metrics`
   - `GET /api/capabilities`
   - `GET /api/connectors/google_docs/auth/start`
   - `GET /api/connectors/google_docs/auth/callback`
@@ -91,11 +92,27 @@ OAuth callback routes may additionally return:
 ## API spec
 - OpenAPI: `backend/openapi.yaml`
 
+## Observability
+- Prometheus-compatible metrics endpoint: `GET /metrics`
+- Provider metrics:
+  - `homer_provider_requests_total`
+  - `homer_provider_request_duration_seconds`
+- Connector metrics:
+  - `homer_connector_requests_total`
+  - `homer_connector_request_duration_seconds`
+- Provider and connector operation logs include `request_id` for request correlation.
+
 ## Examples
 Capabilities:
 
 ```bash
 curl -sS http://localhost:8080/api/capabilities
+```
+
+Metrics:
+
+```bash
+curl -sS http://localhost:8080/metrics
 ```
 
 Summarize:

@@ -3,6 +3,7 @@ package api
 import (
 	"crypto/subtle"
 	"errors"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/alanmaizon/homer/backend/internal/connectors"
 	"github.com/alanmaizon/homer/backend/internal/domain"
 	"github.com/alanmaizon/homer/backend/internal/llm"
+	"github.com/alanmaizon/homer/backend/internal/metrics"
 	"github.com/alanmaizon/homer/backend/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -21,6 +23,10 @@ func RegisterRoutes(router *gin.Engine) {
 
 	router.GET("/api/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	router.GET("/metrics", func(c *gin.Context) {
+		c.Data(http.StatusOK, "text/plain; version=0.0.4; charset=utf-8", []byte(metrics.PrometheusText()))
 	})
 
 	router.GET("/api/capabilities", func(c *gin.Context) {
@@ -165,40 +171,53 @@ func RegisterRoutes(router *gin.Engine) {
 			return
 		}
 
+		started := time.Now()
+		requestID := middleware.GetRequestID(c)
 		connector := newConnectorFromEnv()
 		if connector.Name() == "none" {
+			metrics.RecordConnectorCall("none", "import", "error", "connector_unavailable", time.Since(started))
+			log.Printf(
+				"request_id=%s component=connector connector=none operation=import status=error error_code=connector_unavailable duration_ms=%d",
+				requestID,
+				time.Since(started).Milliseconds(),
+			)
 			writeError(c, http.StatusBadRequest, "connector_unavailable", "no connector is configured")
 			return
 		}
+
+		log.Printf(
+			"request_id=%s component=connector connector=%s operation=import event=start document_id=%s",
+			requestID,
+			connector.Name(),
+			strings.TrimSpace(req.DocumentID),
+		)
 
 		document, err := connector.ImportDocument(c.Request.Context(), connectors.ImportRequest{
 			DocumentID: req.DocumentID,
 			SessionKey: connectorSessionKeyFromRequest(c),
 		})
 		if err != nil {
-			if errors.Is(err, connectors.ErrUnauthorized) {
-				writeError(c, http.StatusBadGateway, "connector_upstream_unauthorized", "connector upstream credentials are invalid")
-				return
-			}
-			if errors.Is(err, connectors.ErrForbidden) {
-				writeError(c, http.StatusForbidden, "connector_forbidden", "connector access is forbidden for this document")
-				return
-			}
-			if errors.Is(err, connectors.ErrDocumentNotFound) {
-				writeError(c, http.StatusNotFound, "connector_document_not_found", "connector document was not found")
-				return
-			}
-			if errors.Is(err, connectors.ErrUnavailable) {
-				writeError(c, http.StatusServiceUnavailable, "connector_service_unavailable", "connector service is unavailable")
-				return
-			}
-			if errors.Is(err, connectors.ErrNotImplemented) {
-				writeError(c, http.StatusNotImplemented, "connector_not_implemented", "connector import is not implemented yet")
-				return
-			}
-			writeError(c, http.StatusInternalServerError, "internal_error", err.Error())
+			status, code, message := connectorOperationError(err, "import")
+			metrics.RecordConnectorCall(connector.Name(), "import", "error", code, time.Since(started))
+			log.Printf(
+				"request_id=%s component=connector connector=%s operation=import status=error error_code=%s duration_ms=%d err=%v",
+				requestID,
+				connector.Name(),
+				code,
+				time.Since(started).Milliseconds(),
+				err,
+			)
+			writeError(c, status, code, message)
 			return
 		}
+
+		metrics.RecordConnectorCall(connector.Name(), "import", "success", "none", time.Since(started))
+		log.Printf(
+			"request_id=%s component=connector connector=%s operation=import status=success error_code=none duration_ms=%d",
+			requestID,
+			connector.Name(),
+			time.Since(started).Milliseconds(),
+		)
 
 		c.JSON(http.StatusOK, domain.ConnectorImportResponse{
 			Connector: connector.Name(),
@@ -228,11 +247,26 @@ func RegisterRoutes(router *gin.Engine) {
 			return
 		}
 
+		started := time.Now()
+		requestID := middleware.GetRequestID(c)
 		connector := newConnectorFromEnv()
 		if connector.Name() == "none" {
+			metrics.RecordConnectorCall("none", "export", "error", "connector_unavailable", time.Since(started))
+			log.Printf(
+				"request_id=%s component=connector connector=none operation=export status=error error_code=connector_unavailable duration_ms=%d",
+				requestID,
+				time.Since(started).Milliseconds(),
+			)
 			writeError(c, http.StatusBadRequest, "connector_unavailable", "no connector is configured")
 			return
 		}
+
+		log.Printf(
+			"request_id=%s component=connector connector=%s operation=export event=start document_id=%s",
+			requestID,
+			connector.Name(),
+			strings.TrimSpace(req.DocumentID),
+		)
 
 		err := connector.ExportContent(c.Request.Context(), connectors.ExportRequest{
 			DocumentID: req.DocumentID,
@@ -240,29 +274,27 @@ func RegisterRoutes(router *gin.Engine) {
 			SessionKey: connectorSessionKeyFromRequest(c),
 		})
 		if err != nil {
-			if errors.Is(err, connectors.ErrUnauthorized) {
-				writeError(c, http.StatusBadGateway, "connector_upstream_unauthorized", "connector upstream credentials are invalid")
-				return
-			}
-			if errors.Is(err, connectors.ErrForbidden) {
-				writeError(c, http.StatusForbidden, "connector_forbidden", "connector access is forbidden for this document")
-				return
-			}
-			if errors.Is(err, connectors.ErrDocumentNotFound) {
-				writeError(c, http.StatusNotFound, "connector_document_not_found", "connector document was not found")
-				return
-			}
-			if errors.Is(err, connectors.ErrUnavailable) {
-				writeError(c, http.StatusServiceUnavailable, "connector_service_unavailable", "connector service is unavailable")
-				return
-			}
-			if errors.Is(err, connectors.ErrNotImplemented) {
-				writeError(c, http.StatusNotImplemented, "connector_not_implemented", "connector export is not implemented yet")
-				return
-			}
-			writeError(c, http.StatusInternalServerError, "internal_error", err.Error())
+			status, code, message := connectorOperationError(err, "export")
+			metrics.RecordConnectorCall(connector.Name(), "export", "error", code, time.Since(started))
+			log.Printf(
+				"request_id=%s component=connector connector=%s operation=export status=error error_code=%s duration_ms=%d err=%v",
+				requestID,
+				connector.Name(),
+				code,
+				time.Since(started).Milliseconds(),
+				err,
+			)
+			writeError(c, status, code, message)
 			return
 		}
+
+		metrics.RecordConnectorCall(connector.Name(), "export", "success", "none", time.Since(started))
+		log.Printf(
+			"request_id=%s component=connector connector=%s operation=export status=success error_code=none duration_ms=%d",
+			requestID,
+			connector.Name(),
+			time.Since(started).Milliseconds(),
+		)
 
 		c.JSON(http.StatusOK, domain.ConnectorExportResponse{
 			Connector: connector.Name(),
@@ -273,6 +305,23 @@ func RegisterRoutes(router *gin.Engine) {
 
 func connectorSessionKeyFromRequest(c *gin.Context) string {
 	return strings.TrimSpace(c.GetHeader("X-Connector-Session"))
+}
+
+func connectorOperationError(err error, operation string) (status int, code string, message string) {
+	switch {
+	case errors.Is(err, connectors.ErrUnauthorized):
+		return http.StatusBadGateway, "connector_upstream_unauthorized", "connector upstream credentials are invalid"
+	case errors.Is(err, connectors.ErrForbidden):
+		return http.StatusForbidden, "connector_forbidden", "connector access is forbidden for this document"
+	case errors.Is(err, connectors.ErrDocumentNotFound):
+		return http.StatusNotFound, "connector_document_not_found", "connector document was not found"
+	case errors.Is(err, connectors.ErrUnavailable):
+		return http.StatusServiceUnavailable, "connector_service_unavailable", "connector service is unavailable"
+	case errors.Is(err, connectors.ErrNotImplemented):
+		return http.StatusNotImplemented, "connector_not_implemented", "connector " + operation + " is not implemented yet"
+	default:
+		return http.StatusInternalServerError, "internal_error", err.Error()
+	}
 }
 
 func validateTaskRequest(req domain.TaskRequest) *domain.APIError {
