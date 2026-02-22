@@ -115,6 +115,7 @@ Connector import (requires `CONNECTOR_PROVIDER=google_docs` and credentials):
 ```bash
 curl -sS -X POST http://localhost:8080/api/connectors/import \
   -H "Content-Type: application/json" \
+  -H "X-Connector-Key: ${CONNECTOR_API_KEY}" \
   -d '{
     "documentId":"doc-123"
   }'
@@ -131,6 +132,7 @@ Copy `.env.example` values into your shell/session:
 - `GEMINI_API_KEY` or `GOOGLE_API_KEY` (required when provider is `gemini`)
 - `GEMINI_MODEL` (default `gemini-2.5-flash`)
 - `CONNECTOR_PROVIDER` (`none` or `google_docs`; default `none`)
+- `CONNECTOR_API_KEY` (optional; when set, required for connector import/export routes)
 - `GOOGLE_DOCS_ACCESS_TOKEN` (recommended for local dev connector calls)
 - `GOOGLE_APPLICATION_CREDENTIALS` (alternative service account credentials file path)
 

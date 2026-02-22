@@ -190,6 +190,53 @@ func TestConnectorImportConnectorUnavailable(t *testing.T) {
 	}
 }
 
+func TestConnectorImportUnauthorizedWhenAPIKeyConfigured(t *testing.T) {
+	t.Setenv("CONNECTOR_API_KEY", "secret")
+	t.Setenv("CONNECTOR_PROVIDER", "none")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/connectors/import", strings.NewReader(`{"documentId":"doc-1"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+
+	testRouter().ServeHTTP(res, req)
+
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", res.Code)
+	}
+
+	var payload errorEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error.Code != "connector_unauthorized" {
+		t.Fatalf("expected connector_unauthorized, got %q", payload.Error.Code)
+	}
+}
+
+func TestConnectorImportAuthorizedWithAPIKey(t *testing.T) {
+	t.Setenv("CONNECTOR_API_KEY", "secret")
+	t.Setenv("CONNECTOR_PROVIDER", "none")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/connectors/import", strings.NewReader(`{"documentId":"doc-1"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Connector-Key", "secret")
+	res := httptest.NewRecorder()
+
+	testRouter().ServeHTTP(res, req)
+
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", res.Code)
+	}
+
+	var payload errorEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error.Code != "connector_unavailable" {
+		t.Fatalf("expected connector_unavailable, got %q", payload.Error.Code)
+	}
+}
+
 func TestConnectorImportCredentialsUnavailable(t *testing.T) {
 	t.Setenv("CONNECTOR_PROVIDER", "google_docs")
 	t.Setenv("GOOGLE_DOCS_ACCESS_TOKEN", "")
@@ -259,6 +306,29 @@ func TestConnectorExportCredentialsUnavailable(t *testing.T) {
 	}
 	if payload.Error.Code != "connector_unavailable" {
 		t.Fatalf("expected connector_unavailable, got %q", payload.Error.Code)
+	}
+}
+
+func TestConnectorExportUnauthorizedWhenAPIKeyConfigured(t *testing.T) {
+	t.Setenv("CONNECTOR_API_KEY", "secret")
+	t.Setenv("CONNECTOR_PROVIDER", "none")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/connectors/export", strings.NewReader(`{"documentId":"doc-1","content":"Updated content"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+
+	testRouter().ServeHTTP(res, req)
+
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", res.Code)
+	}
+
+	var payload errorEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error.Code != "connector_unauthorized" {
+		t.Fatalf("expected connector_unauthorized, got %q", payload.Error.Code)
 	}
 }
 

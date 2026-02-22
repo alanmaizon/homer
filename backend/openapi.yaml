@@ -39,6 +39,9 @@ paths:
     post:
       summary: Import document from configured connector
       operationId: importConnectorDocument
+      description: Requires `X-Connector-Key` header when `CONNECTOR_API_KEY` is configured.
+      security:
+        - ConnectorApiKey: []
       requestBody:
         required: true
         content:
@@ -64,6 +67,18 @@ paths:
                     error:
                       code: connector_unavailable
                       message: connector credentials are unavailable
+        "401":
+          description: Connector request is not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                connectorUnauthorized:
+                  value:
+                    error:
+                      code: connector_unauthorized
+                      message: connector API key is invalid
         "501":
           description: Connector import not implemented
           content:
@@ -74,6 +89,9 @@ paths:
     post:
       summary: Export content through configured connector
       operationId: exportConnectorContent
+      description: Requires `X-Connector-Key` header when `CONNECTOR_API_KEY` is configured.
+      security:
+        - ConnectorApiKey: []
       requestBody:
         required: true
         content:
@@ -99,6 +117,18 @@ paths:
                     error:
                       code: connector_unavailable
                       message: connector credentials are unavailable
+        "401":
+          description: Connector request is not authorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+              examples:
+                connectorUnauthorized:
+                  value:
+                    error:
+                      code: connector_unauthorized
+                      message: connector API key is invalid
         "501":
           description: Connector export not implemented
           content:
@@ -163,6 +193,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/APIErrorResponse"
 components:
+  securitySchemes:
+    ConnectorApiKey:
+      type: apiKey
+      in: header
+      name: X-Connector-Key
   schemas:
     Document:
       type: object

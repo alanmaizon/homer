@@ -1,6 +1,7 @@
 package api
 
 import (
+	"crypto/subtle"
 	"errors"
 	"net/http"
 	"os"
@@ -66,6 +67,10 @@ func RegisterRoutes(router *gin.Engine) {
 	})
 
 	router.POST("/api/connectors/import", func(c *gin.Context) {
+		if !authorizeConnectorRequest(c) {
+			return
+		}
+
 		var req domain.ConnectorImportRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			writeError(c, http.StatusBadRequest, "invalid_payload", "invalid connector import payload")
@@ -105,6 +110,10 @@ func RegisterRoutes(router *gin.Engine) {
 	})
 
 	router.POST("/api/connectors/export", func(c *gin.Context) {
+		if !authorizeConnectorRequest(c) {
+			return
+		}
+
 		var req domain.ConnectorExportRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			writeError(c, http.StatusBadRequest, "invalid_payload", "invalid connector export payload")
@@ -197,4 +206,26 @@ func envOrDefault(key string, fallback string) string {
 	}
 
 	return value
+}
+
+func authorizeConnectorRequest(c *gin.Context) bool {
+	requiredKey := strings.TrimSpace(os.Getenv("CONNECTOR_API_KEY"))
+	if requiredKey == "" {
+		return true
+	}
+
+	providedKey := strings.TrimSpace(c.GetHeader("X-Connector-Key"))
+	if providedKey == "" {
+		authorization := strings.TrimSpace(c.GetHeader("Authorization"))
+		if strings.HasPrefix(strings.ToLower(authorization), "bearer ") {
+			providedKey = strings.TrimSpace(authorization[7:])
+		}
+	}
+
+	if subtle.ConstantTimeCompare([]byte(requiredKey), []byte(providedKey)) == 1 {
+		return true
+	}
+
+	writeError(c, http.StatusUnauthorized, "connector_unauthorized", "connector API key is invalid")
+	return false
 }
