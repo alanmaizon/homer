@@ -139,6 +139,96 @@ func TestCapabilitiesFallbackVisibility(t *testing.T) {
 	}
 }
 
+func TestConnectorImportConnectorUnavailable(t *testing.T) {
+	t.Setenv("CONNECTOR_PROVIDER", "none")
+	req := httptest.NewRequest(http.MethodPost, "/api/connectors/import", strings.NewReader(`{"documentId":"doc-1"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+
+	testRouter().ServeHTTP(res, req)
+
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", res.Code)
+	}
+
+	var payload errorEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error.Code != "connector_unavailable" {
+		t.Fatalf("expected connector_unavailable, got %q", payload.Error.Code)
+	}
+}
+
+func TestConnectorImportNotImplemented(t *testing.T) {
+	t.Setenv("CONNECTOR_PROVIDER", "google_docs")
+	t.Setenv("GOOGLE_CLIENT_ID", "test-client-id")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/connectors/import", strings.NewReader(`{"documentId":"doc-1"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+
+	testRouter().ServeHTTP(res, req)
+
+	if res.Code != http.StatusNotImplemented {
+		t.Fatalf("expected status 501, got %d", res.Code)
+	}
+
+	var payload errorEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error.Code != "connector_not_implemented" {
+		t.Fatalf("expected connector_not_implemented, got %q", payload.Error.Code)
+	}
+}
+
+func TestConnectorExportValidation(t *testing.T) {
+	t.Setenv("CONNECTOR_PROVIDER", "google_docs")
+	t.Setenv("GOOGLE_CLIENT_ID", "test-client-id")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/connectors/export", strings.NewReader(`{"documentId":"doc-1","content":" "}`))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+
+	testRouter().ServeHTTP(res, req)
+
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected status 400, got %d", res.Code)
+	}
+
+	var payload errorEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error.Code != "missing_content" {
+		t.Fatalf("expected missing_content, got %q", payload.Error.Code)
+	}
+}
+
+func TestConnectorExportNotImplemented(t *testing.T) {
+	t.Setenv("CONNECTOR_PROVIDER", "google_docs")
+	t.Setenv("GOOGLE_CLIENT_ID", "test-client-id")
+
+	req := httptest.NewRequest(http.MethodPost, "/api/connectors/export", strings.NewReader(`{"documentId":"doc-1","content":"Updated content"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+
+	testRouter().ServeHTTP(res, req)
+
+	if res.Code != http.StatusNotImplemented {
+		t.Fatalf("expected status 501, got %d", res.Code)
+	}
+
+	var payload errorEnvelope
+	if err := json.Unmarshal(res.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if payload.Error.Code != "connector_not_implemented" {
+		t.Fatalf("expected connector_not_implemented, got %q", payload.Error.Code)
+	}
+}
+
 func TestTaskValidationErrors(t *testing.T) {
 	testCases := []struct {
 		name       string

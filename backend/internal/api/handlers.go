@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"os"
 	"strings"
@@ -62,6 +63,81 @@ func RegisterRoutes(router *gin.Engine) {
 		response.Metadata.RequestID = middleware.GetRequestID(c)
 
 		c.JSON(http.StatusOK, response)
+	})
+
+	router.POST("/api/connectors/import", func(c *gin.Context) {
+		var req domain.ConnectorImportRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid_payload", "invalid connector import payload")
+			return
+		}
+		if strings.TrimSpace(req.DocumentID) == "" {
+			writeError(c, http.StatusBadRequest, "missing_document_id", "documentId is required")
+			return
+		}
+
+		connector := connectors.NewConnectorFromEnv()
+		if connector.Name() == "none" {
+			writeError(c, http.StatusBadRequest, "connector_unavailable", "no connector is configured")
+			return
+		}
+
+		document, err := connector.ImportDocument(c.Request.Context(), connectors.ImportRequest{
+			DocumentID: req.DocumentID,
+		})
+		if err != nil {
+			if errors.Is(err, connectors.ErrNotImplemented) {
+				writeError(c, http.StatusNotImplemented, "connector_not_implemented", "connector import is not implemented yet")
+				return
+			}
+			writeError(c, http.StatusInternalServerError, "internal_error", err.Error())
+			return
+		}
+
+		c.JSON(http.StatusOK, domain.ConnectorImportResponse{
+			Connector: connector.Name(),
+			Document:  document,
+		})
+	})
+
+	router.POST("/api/connectors/export", func(c *gin.Context) {
+		var req domain.ConnectorExportRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			writeError(c, http.StatusBadRequest, "invalid_payload", "invalid connector export payload")
+			return
+		}
+		if strings.TrimSpace(req.DocumentID) == "" {
+			writeError(c, http.StatusBadRequest, "missing_document_id", "documentId is required")
+			return
+		}
+		if strings.TrimSpace(req.Content) == "" {
+			writeError(c, http.StatusBadRequest, "missing_content", "content is required")
+			return
+		}
+
+		connector := connectors.NewConnectorFromEnv()
+		if connector.Name() == "none" {
+			writeError(c, http.StatusBadRequest, "connector_unavailable", "no connector is configured")
+			return
+		}
+
+		err := connector.ExportContent(c.Request.Context(), connectors.ExportRequest{
+			DocumentID: req.DocumentID,
+			Content:    req.Content,
+		})
+		if err != nil {
+			if errors.Is(err, connectors.ErrNotImplemented) {
+				writeError(c, http.StatusNotImplemented, "connector_not_implemented", "connector export is not implemented yet")
+				return
+			}
+			writeError(c, http.StatusInternalServerError, "internal_error", err.Error())
+			return
+		}
+
+		c.JSON(http.StatusOK, domain.ConnectorExportResponse{
+			Connector: connector.Name(),
+			Exported:  true,
+		})
 	})
 }
 

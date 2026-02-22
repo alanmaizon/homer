@@ -75,3 +75,22 @@ type FeatureFlags struct {
 	ConnectorImport bool `json:"connectorImport"`
 	ConnectorExport bool `json:"connectorExport"`
 }
+
+type ConnectorImportRequest struct {
+	DocumentID string `json:"documentId"`
+}
+
+type ConnectorImportResponse struct {
+	Connector string   `json:"connector"`
+	Document  Document `json:"document"`
+}
+
+type ConnectorExportRequest struct {
+	DocumentID string `json:"documentId"`
+	Content    string `json:"content"`
+}
+
+type ConnectorExportResponse struct {
+	Connector string `json:"connector"`
+	Exported  bool   `json:"exported"`
+}

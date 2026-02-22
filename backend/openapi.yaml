@@ -35,6 +35,64 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CapabilitiesResponse"
+  /api/connectors/import:
+    post:
+      summary: Import document from configured connector
+      operationId: importConnectorDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectorImportRequest"
+      responses:
+        "200":
+          description: Connector document import succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorImportResponse"
+        "400":
+          description: Invalid payload or connector unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+        "501":
+          description: Connector import not implemented
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+  /api/connectors/export:
+    post:
+      summary: Export content through configured connector
+      operationId: exportConnectorContent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectorExportRequest"
+      responses:
+        "200":
+          description: Connector export succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorExportResponse"
+        "400":
+          description: Invalid payload or connector unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
+        "501":
+          description: Connector export not implemented
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/APIErrorResponse"
   /api/task:
     post:
       summary: Run summarize or rewrite task
@@ -254,4 +312,45 @@ components:
         connectorImport:
           type: boolean
         connectorExport:
+          type: boolean
+    ConnectorImportRequest:
+      type: object
+      required:
+        - documentId
+      properties:
+        documentId:
+          type: string
+    ConnectorImportResponse:
+      type: object
+      required:
+        - connector
+        - document
+      properties:
+        connector:
+          type: string
+          enum:
+            - google_docs
+        document:
+          $ref: "#/components/schemas/Document"
+    ConnectorExportRequest:
+      type: object
+      required:
+        - documentId
+        - content
+      properties:
+        documentId:
+          type: string
+        content:
+          type: string
+    ConnectorExportResponse:
+      type: object
+      required:
+        - connector
+        - exported
+      properties:
+        connector:
+          type: string
+          enum:
+            - google_docs
+        exported:
           type: boolean

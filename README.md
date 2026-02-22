@@ -12,6 +12,8 @@ CI status:
 - Exposes HTTP API endpoints:
   - `GET /api/health`
   - `GET /api/capabilities`
+  - `POST /api/connectors/import`
+  - `POST /api/connectors/export`
   - `POST /api/task`
 
 ## Architecture
@@ -105,6 +107,16 @@ curl -sS -X POST http://localhost:8080/api/task \
     "text":"We will utilize the system to optimize efficiency.",
     "mode":"simplify",
     "instructions":"Keep it short"
+  }'
+```
+
+Connector import (stubbed connector returns `501` until implemented):
+
+```bash
+curl -sS -X POST http://localhost:8080/api/connectors/import \
+  -H "Content-Type: application/json" \
+  -d '{
+    "documentId":"doc-123"
   }'
 ```
 
