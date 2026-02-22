@@ -184,6 +184,50 @@ cd backend
 go run ./cmd/server
 ```
 
+## CLI demo
+Run the platform-agnostic CLI against a local or remote Homer backend:
+
+```bash
+cd backend
+go run ./cmd/cli --base-url http://localhost:8080 health
+```
+
+Common commands:
+
+```bash
+# Runtime info
+go run ./cmd/cli --base-url http://localhost:8080 capabilities
+
+# Summarize
+go run ./cmd/cli --base-url http://localhost:8080 summarize \
+  -id doc-1 \
+  -title "Meeting Notes" \
+  -content "Launch is planned for Q1 and hiring starts next week." \
+  -style bullet
+
+# Rewrite
+go run ./cmd/cli --base-url http://localhost:8080 rewrite \
+  -text "We will utilize the platform to optimize efficiency." \
+  -mode simplify
+
+# Connector import/export (when connector routes are enabled)
+go run ./cmd/cli --base-url http://localhost:8080 \
+  --connector-key "$CONNECTOR_API_KEY" \
+  --connector-session "$CONNECTOR_SESSION_KEY" \
+  connector-import -document-id doc-123
+
+go run ./cmd/cli --base-url http://localhost:8080 \
+  --connector-key "$CONNECTOR_API_KEY" \
+  --connector-session "$CONNECTOR_SESSION_KEY" \
+  connector-export -document-id doc-123 -content "Updated content"
+```
+
+CLI environment variables:
+- `HOMER_BASE_URL` (default API base URL for CLI)
+- `HOMER_AUTH_TOKEN` (Bearer token for `Authorization`)
+- `HOMER_CONNECTOR_KEY` (default `X-Connector-Key`)
+- `HOMER_CONNECTOR_SESSION` (default `X-Connector-Session`)
+
 ## Docker
 Build:
 
@@ -206,9 +250,11 @@ go test ./...
 ## Repo layout
 ```text
 backend/
+  cmd/cli/main.go
   cmd/server/main.go
   internal/api/
   internal/agents/
+  internal/cli/
   internal/connectors/
   internal/domain/
   internal/llm/
