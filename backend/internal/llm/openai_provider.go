@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/alanmaizon/homer/backend/internal/domain"
 )
@@ -16,9 +18,11 @@ import (
 const openAIURL = "https://api.openai.com/v1/chat/completions"
 
 type OpenAIProvider struct {
-	apiKey string
-	model  string
-	client *http.Client
+	apiKey     string
+	model      string
+	client     *http.Client
+	timeout    time.Duration
+	maxRetries int
 }
 
 func NewOpenAIProviderFromEnv() (*OpenAIProvider, error) {
@@ -30,7 +34,16 @@ func NewOpenAIProviderFromEnv() (*OpenAIProvider, error) {
 	if model == "" {
 		model = "gpt-4o-mini"
 	}
-	return &OpenAIProvider{apiKey: apiKey, model: model, client: http.DefaultClient}, nil
+
+	policy := loadRuntimePolicyFromEnv()
+
+	return &OpenAIProvider{
+		apiKey:     apiKey,
+		model:      model,
+		client:     http.DefaultClient,
+		timeout:    policy.timeout,
+		maxRetries: policy.maxRetries,
+	}, nil
 }
 
 func (o *OpenAIProvider) Name() string {
@@ -70,35 +83,73 @@ func (o *OpenAIProvider) call(ctx context.Context, prompt string) (string, error
 		return "", err
 	}
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, openAIURL, bytes.NewReader(body))
-	if err != nil {
-		return "", err
-	}
-	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", "Bearer "+o.apiKey)
+	totalAttempts := o.maxRetries + 1
+	for attempt := 0; attempt < totalAttempts; attempt++ {
+		attemptCtx, cancel := context.WithTimeout(ctx, o.timeout)
 
-	response, err := o.client.Do(request)
-	if err != nil {
-		return "", err
-	}
-	defer response.Body.Close()
+		request, err := http.NewRequestWithContext(attemptCtx, http.MethodPost, openAIURL, bytes.NewReader(body))
+		if err != nil {
+			cancel()
+			return "", err
+		}
+		request.Header.Set("Content-Type", "application/json")
+		request.Header.Set("Authorization", "Bearer "+o.apiKey)
 
-	if response.StatusCode >= http.StatusBadRequest {
-		return "", fmt.Errorf("openai request failed with status %d", response.StatusCode)
+		response, err := o.client.Do(request)
+		if err != nil {
+			cancel()
+			if shouldRetryError(err) && attempt < totalAttempts-1 {
+				if waitErr := waitForBackoff(ctx, attempt); waitErr != nil {
+					return "", waitErr
+				}
+				continue
+			}
+			return "", err
+		}
+
+		if response.StatusCode >= http.StatusBadRequest {
+			responseBytes, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+			_ = response.Body.Close()
+			cancel()
+
+			httpErr := &providerHTTPError{
+				provider:   "openai",
+				statusCode: response.StatusCode,
+				message:    strings.TrimSpace(string(responseBytes)),
+			}
+			if shouldRetryHTTPStatus(response.StatusCode) && attempt < totalAttempts-1 {
+				if waitErr := waitForBackoff(ctx, attempt); waitErr != nil {
+					return "", waitErr
+				}
+				continue
+			}
+			return "", httpErr
+		}
+
+		var parsed struct {
+			Choices []struct {
+				Message struct {
+					Content string `json:"content"`
+				} `json:"message"`
+			} `json:"choices"`
+		}
+		decodeErr := json.NewDecoder(response.Body).Decode(&parsed)
+		_ = response.Body.Close()
+		cancel()
+		if decodeErr != nil {
+			if shouldRetryError(decodeErr) && attempt < totalAttempts-1 {
+				if waitErr := waitForBackoff(ctx, attempt); waitErr != nil {
+					return "", waitErr
+				}
+				continue
+			}
+			return "", decodeErr
+		}
+		if len(parsed.Choices) == 0 {
+			return "", errors.New("openai returned no choices")
+		}
+		return strings.TrimSpace(parsed.Choices[0].Message.Content), nil
 	}
 
-	var parsed struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-	if err := json.NewDecoder(response.Body).Decode(&parsed); err != nil {
-		return "", err
-	}
-	if len(parsed.Choices) == 0 {
-		return "", errors.New("openai returned no choices")
-	}
-	return strings.TrimSpace(parsed.Choices[0].Message.Content), nil
+	return "", errors.New("openai request failed after retries")
 }

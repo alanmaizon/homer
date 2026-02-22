@@ -112,6 +112,8 @@ curl -sS -X POST http://localhost:8080/api/task \
 Copy `.env.example` values into your shell/session:
 - `PORT` (default `8080`)
 - `LLM_PROVIDER` (`mock`, `openai`, or `gemini`)
+- `LLM_TIMEOUT_MS` (outbound LLM call timeout in ms; default `15000`)
+- `LLM_MAX_RETRIES` (bounded retry count per outbound LLM call; default `2`, max `5`)
 - `OPENAI_API_KEY` (required when provider is `openai`)
 - `OPENAI_MODEL` (default `gpt-4o-mini`)
 - `GEMINI_API_KEY` or `GOOGLE_API_KEY` (required when provider is `gemini`)

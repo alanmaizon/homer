@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/alanmaizon/homer/backend/internal/domain"
 	"google.golang.org/genai"
 )
 
 type GeminiProvider struct {
-	model  string
-	client *genai.Client
+	model      string
+	client     *genai.Client
+	timeout    time.Duration
+	maxRetries int
 }
 
 func NewGeminiProviderFromEnv() (*GeminiProvider, error) {
@@ -38,9 +41,13 @@ func NewGeminiProviderFromEnv() (*GeminiProvider, error) {
 		return nil, fmt.Errorf("failed to initialize gemini client: %w", err)
 	}
 
+	policy := loadRuntimePolicyFromEnv()
+
 	return &GeminiProvider{
-		model:  model,
-		client: client,
+		model:      model,
+		client:     client,
+		timeout:    policy.timeout,
+		maxRetries: policy.maxRetries,
 	}, nil
 }
 
@@ -70,19 +77,32 @@ func (g *GeminiProvider) Rewrite(ctx context.Context, text string, mode string, 
 }
 
 func (g *GeminiProvider) call(ctx context.Context, prompt string) (string, error) {
-	response, err := g.client.Models.GenerateContent(
-		ctx,
-		g.model,
-		genai.Text(prompt),
-		nil,
-	)
-	if err != nil {
-		return "", err
+	totalAttempts := g.maxRetries + 1
+	for attempt := 0; attempt < totalAttempts; attempt++ {
+		attemptCtx, cancel := context.WithTimeout(ctx, g.timeout)
+		response, err := g.client.Models.GenerateContent(
+			attemptCtx,
+			g.model,
+			genai.Text(prompt),
+			nil,
+		)
+		cancel()
+		if err != nil {
+			if shouldRetryError(err) && attempt < totalAttempts-1 {
+				if waitErr := waitForBackoff(ctx, attempt); waitErr != nil {
+					return "", waitErr
+				}
+				continue
+			}
+			return "", err
+		}
+
+		text := strings.TrimSpace(response.Text())
+		if text == "" {
+			return "", errors.New("gemini returned no text")
+		}
+		return text, nil
 	}
 
-	text := strings.TrimSpace(response.Text())
-	if text == "" {
-		return "", errors.New("gemini returned no text")
-	}
-	return text, nil
+	return "", errors.New("gemini request failed after retries")
 }
